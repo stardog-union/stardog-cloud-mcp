@@ -1,10 +1,7 @@
-import logging
 from typing import Optional
 
 from stardog.cloud.client import BaseClient
 from stardog.cloud.voicebox import VoiceboxAnswer, VoiceboxAppSettings
-
-logger = logging.getLogger("stardog_cloud_mcp")
 
 
 class ToolHandler:
@@ -99,7 +96,7 @@ class ToolHandler:
             A string representation of the generated SPARQL query
         """
         if not question:
-            raise ValueError("question is required")
+            raise ValueError("A valid question is required to execute the tool")
 
         voicebox_app = self.cloud_client.voicebox_app(
             app_api_token=api_token, client_id=client_id

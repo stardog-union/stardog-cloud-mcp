@@ -5,7 +5,7 @@ from tools import ToolHandler
 
 
 @pytest.fixture
-def handler():
+def tool_handler():
     mock_voicebox_app = MagicMock()
     mock_voicebox_app.async_settings = AsyncMock(return_value=MagicMock(
         name="test-vbx-app-1",

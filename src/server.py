@@ -37,17 +37,7 @@ async def get_api_token(arg_api_token: str) -> Optional[str]:
     If both HTTP header and argument token are present, prefer HTTP header token.
     """
     headers = get_http_headers()
-    print(f"HEADERS: {headers}", file=sys.stderr)
     http_header_token = headers.get("x-sdc-api-key") if headers else None
-    ctx = get_context()
-    if ctx is not None:
-        await ctx.info(
-            f"PRINTING TOKEN VALUES: HTTP Header Token: {http_header_token}, Argument Token: {arg_api_token}"
-        )
-    print(
-        f"PRINTING TOKEN VALUES: HTTP Header Token: {http_header_token}, Argument Token: {arg_api_token}",
-        file=sys.stderr,
-    )
     if http_header_token and arg_api_token:
         return http_header_token
     resolved_token = http_header_token or arg_api_token
@@ -62,17 +52,7 @@ async def get_client_id(arg_client_id: str) -> Optional[str]:
     If both HTTP header and argument client ID are present, prefer HTTP header client ID.
     """
     headers = get_http_headers()
-    print(f"HEADERS: {headers}", file=sys.stderr)
     http_header_client_id = headers.get("x-sdc-client-id") if headers else None
-    ctx = get_context()
-    if ctx is not None:
-        await ctx.info(
-            f"PRINTING CLIENT ID VALUES: HTTP Header Client ID: {http_header_client_id}, Argument Client ID: {arg_client_id}"
-        )
-    print(
-        f"PRINTING CLIENT ID VALUES: HTTP Header Client ID: {http_header_client_id}, Argument Client ID: {arg_client_id}",
-        file=sys.stderr,
-    )
     if http_header_client_id and arg_client_id:
         return http_header_client_id
     return http_header_client_id or arg_client_id
@@ -100,10 +80,6 @@ def initialize_server(
         """
         resolved_token = await get_api_token(api_token)
         resolved_client_id = await get_client_id(client_id)
-        print(
-            f"VOICEBOX_SETTINGS TOKEN-settings: {resolved_token} & {resolved_client_id}",
-            file=sys.stderr,
-        )
         return await tool_handler.handle_voicebox_settings(
             resolved_token, resolved_client_id
         )
@@ -123,10 +99,6 @@ def initialize_server(
         """
         resolved_token = await get_api_token(api_token)
         resolved_client_id = await get_client_id(client_id)
-        print(
-            f"VOICEBOX_SETTINGS TOKEN-settings: {resolved_token} & {resolved_client_id}",
-            file=sys.stderr,
-        )
         return await tool_handler.handle_voicebox_ask(
             api_token=resolved_token,
             client_id=resolved_client_id,
@@ -150,10 +122,6 @@ def initialize_server(
         """
         resolved_token = await get_api_token(api_token)
         resolved_client_id = await get_client_id(client_id)
-        print(
-            f"VOICEBOX_SETTINGS TOKEN-settings: {resolved_token} & {resolved_client_id}",
-            file=sys.stderr,
-        )
         return await tool_handler.handle_voicebox_generate_query(
             api_token=resolved_token,
             client_id=resolved_client_id,
@@ -170,11 +138,11 @@ def initialize_server(
     else:
         logger.info("\U0001f9ea Starting MCP server in STDIO (local) mode")
         server.run(transport="stdio")
+    return server
 
 
 if __name__ == "__main__":
-    # TODO: can remove, following prints are for logging into the MCP logs
-    print("Starting Stardog MCP server...", file=sys.stderr)
+    # print("Starting Stardog MCP server...", file=sys.stderr)
     parser = argparse.ArgumentParser(description="Stardog Cloud MCP Server")
     parser.add_argument(
         "--endpoint",
@@ -196,17 +164,8 @@ if __name__ == "__main__":
     parser.add_argument("--client_id", type=str, default="VBX-APP")
 
     args = parser.parse_args()
-    print(f"ENDPOINT -> {args.endpoint}", file=sys.stderr)
 
     try:
-        print(
-            "Now going to actually start the Stardog Cloud MCP server...",
-            file=sys.stderr,
-        )
-        # if args.mode == "stdio":
-        #     asyncio.run(start_server(args.endpoint, args.token, args.mode, args.port))
-        # else:
-        #     start_server(args.endpoint, args.token, args.mode, args.port)
         initialize_server(
             args.endpoint, args.token, args.client_id, args.mode, args.port
         )
