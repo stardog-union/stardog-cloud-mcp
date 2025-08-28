@@ -99,7 +99,7 @@ async def test_get_client_id_header_only(mock_get_context, monkeypatch):
 
 @pytest.mark.asyncio
 @patch('server.get_context', return_value=None)
-async def test_get_client_id_arg_only(mock_get_context, monkeypatch):
+async def test_get_client_id_arg_only(monkeypatch):
     from server import get_client_id
     monkeypatch.setattr("server.get_http_headers", lambda: None)
     result = await get_client_id("arg-client")
@@ -107,7 +107,7 @@ async def test_get_client_id_arg_only(mock_get_context, monkeypatch):
 
 @pytest.mark.asyncio
 @patch('server.get_context', return_value=None)
-async def test_get_client_id_none(mock_get_context, monkeypatch):
+async def test_get_client_id_none(monkeypatch):
     from server import get_client_id
     monkeypatch.setattr("server.get_http_headers", lambda: None)
     result = await get_client_id(None)
