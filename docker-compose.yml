@@ -1,0 +1,14 @@
+services:
+  stardog-cloud-mcp:
+    image: stardog-cloud-mcp
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 7001:7000
+    environment:
+      - PYTHONUNBUFFERED=1
+      - API_TOKEN
+      - SDC_ENDPOINT
+    volumes:
+      - ./:/app
