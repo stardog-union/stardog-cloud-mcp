@@ -1,7 +1,12 @@
+import logging
 from typing import Optional
 
 from stardog.cloud.client import BaseClient
 from stardog.cloud.voicebox import VoiceboxAnswer, VoiceboxAppSettings
+
+from exceptions import StardogMCPToolException
+
+logger = logging.getLogger("stardog_cloud_mcp")
 
 
 class ToolHandler:
@@ -17,11 +22,6 @@ class ToolHandler:
             cloud_client: The Stardog Cloud client
         """
         self.cloud_client = cloud_client
-        self.tool_dispatch = {
-            "voicebox_settings": self.handle_voicebox_settings,
-            "voicebox_ask": self.handle_voicebox_ask,
-            "voicebox_generate_query": self.handle_voicebox_generate_query,
-        }
 
     async def handle_voicebox_settings(
         self, api_token: str, client_id: str | None
@@ -34,10 +34,17 @@ class ToolHandler:
         Returns:
             A string representation of the Voicebox settings
         """
-        voicebox_app = self.cloud_client.voicebox_app(
-            app_api_token=api_token, client_id=client_id
-        )
-        voicebox_settings: VoiceboxAppSettings = await voicebox_app.async_settings()
+        try:
+            voicebox_app = self.cloud_client.voicebox_app(
+                app_api_token=api_token, client_id=client_id
+            )
+            voicebox_settings: VoiceboxAppSettings = await voicebox_app.async_settings()
+        except Exception as e:
+            logger.error(f"Error occurred while fetching Voicebox settings: {e}")
+            raise StardogMCPToolException(
+                tool_name="voicebox_settings", message=str(e)
+            ) from e
+
         return str(voicebox_settings)
 
     async def handle_voicebox_ask(
@@ -63,16 +70,23 @@ class ToolHandler:
         if not question:
             raise ValueError("A valid question is required to execute the tool")
 
-        voicebox_app = self.cloud_client.voicebox_app(
-            app_api_token=api_token, client_id=client_id
-        )
+        try:
+            voicebox_app = self.cloud_client.voicebox_app(
+                app_api_token=api_token, client_id=client_id
+            )
 
-        answer: VoiceboxAnswer = await voicebox_app.async_ask(
-            question=question,
-            conversation_id=conversation_id,
-            client_id=client_id,
-            stardog_auth_token_override=stardog_auth_token_override,
-        )
+            answer: VoiceboxAnswer = await voicebox_app.async_ask(
+                question=question,
+                conversation_id=conversation_id,
+                client_id=client_id,
+                stardog_auth_token_override=stardog_auth_token_override,
+            )
+        except Exception as e:
+            logger.error(f"Error occurred while asking question: {e}")
+            raise StardogMCPToolException(
+                tool_name="voicebox_ask", message=str(e)
+            ) from e
+
         return str(answer)
 
     async def handle_voicebox_generate_query(
@@ -98,13 +112,19 @@ class ToolHandler:
         if not question:
             raise ValueError("A valid question is required to execute the tool")
 
-        voicebox_app = self.cloud_client.voicebox_app(
-            app_api_token=api_token, client_id=client_id
-        )
-        response: VoiceboxAnswer = await voicebox_app.async_generate_query(
-            question=question,
-            conversation_id=conversation_id,
-            client_id=client_id,
-            stardog_auth_token_override=stardog_auth_token_override,
-        )
+        try:
+            voicebox_app = self.cloud_client.voicebox_app(
+                app_api_token=api_token, client_id=client_id
+            )
+            response: VoiceboxAnswer = await voicebox_app.async_generate_query(
+                question=question,
+                conversation_id=conversation_id,
+                client_id=client_id,
+                stardog_auth_token_override=stardog_auth_token_override,
+            )
+        except Exception as e:
+            logger.error(f"Error occurred while generating SPARQL query: {e}")
+            raise StardogMCPToolException(
+                tool_name="voicebox_generate_query", message=str(e)
+            ) from e
         return str(response)

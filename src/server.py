@@ -156,7 +156,6 @@ if __name__ == "__main__":
         help="Stardog Cloud API token",
         default=os.getenv("API_TOKEN"),
     )
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument(
         "--mode", choices=["stdio", "http"], default=os.getenv("MCP_MODE", "stdio")
     )
