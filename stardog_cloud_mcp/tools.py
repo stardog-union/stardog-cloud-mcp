@@ -4,7 +4,7 @@ from typing import Optional
 from stardog.cloud.client import BaseClient
 from stardog.cloud.voicebox import VoiceboxAnswer, VoiceboxAppSettings
 
-from exceptions import StardogMCPToolException
+from stardog_cloud_mcp.exceptions import StardogMCPToolException
 
 logger = logging.getLogger("stardog_cloud_mcp")
 

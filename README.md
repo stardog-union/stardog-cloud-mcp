@@ -74,17 +74,13 @@ Use the following sample json to make Claude Desktop to point to your local MCP 
 ```json
 {
     "mcpServers": {
-        "vbx-cloud-mcp": {
+        "stardog-cloud-mcp": {
             "command": "uv",
             "args": [
                 "--directory",
-                "/path/to/parent/directory/of/server",
+                "/path/to/stardog-cloud-mcp",
                 "run",
-                "server.py",
-                "--mode",
-                "stdio",
-                "--port",
-                "7000",
+                "stardog-cloud-mcp",
                 "--token",
                 "your_stardog_cloud_voicebox_api_token",
                 "--client_id",
@@ -95,7 +91,7 @@ Use the following sample json to make Claude Desktop to point to your local MCP 
 }
 ```
 
-> **NOTE on args:**  
+> [!NOTE]
 > - You can additionally specify `--endpoint` to point to a different Stardog Cloud instance \[Default: https://cloud.stardog.com/api\]  
 > - The `--client_id` is optional but recommended to help track usage
 ### **Cursor**: 
@@ -106,17 +102,13 @@ Use Cursor's MCP integration to connect to your local server by configuring the 
 ```json
 {
   "mcpServers": {
-    "vbx-cloud-mcp": {
+    "stardog-cloud-mcp": {
       "command": "uv",
       "args": [
         "--directory",
-        "/path/to/parent/directory/of/server",
+        "/path/to/stardog-cloud-mcp",
         "run",
-        "server.py",
-        "--mode",
-        "stdio",
-        "--port",
-        "7000",
+        "stardog-cloud-mcp",
         "--token",
         "your_stardog_cloud_voicebox_api_token",
         "--client_id",
@@ -144,13 +136,17 @@ Add the following to your Cursor configuration:
     "vbx-cloud-mcp": {
       "url": "http://0.0.0.0:7001/mcp",
       "headers": {
-        "x-sdc-api-key": "your_stardog_cloud_voicebox_api_token"
+        "x-sdc-api-key": "your_stardog_cloud_voicebox_api_token",
+        "x-sdc-client-id": "your_stardog_cloud_voicebox_app_client_id",
+        "x-sd-auth-token": "optional_stardog_auth_token_override"
       }
     }
   }
 }
 ```
 See [Cursor MCP documentation](https://docs.cursor.com/en/context/mcp#using-mcp-json) for more details.
+
+**Note:** The `x-sd-auth-token` header is an optional bearer token to override the default Stardog token for Voicebox. This is useful when connecting via SSO (e.g., Microsoft Entra) to supply a custom SSO token for Stardog authentication.
 
 ### Integrating with Claude
 
@@ -166,13 +162,19 @@ Sample configuration for Claude Desktop:
         "mcp-remote",
         "http://localhost:7001/mcp",
         "--header",
-        "x-sdc-api-key: your_stardog_cloud_voicebox_api_token"
+        "x-sdc-api-key: your_stardog_cloud_voicebox_api_token",
+        "--header",
+        "x-sdc-client-id: your_stardog_cloud_voicebox_app_client_id",
+        "--header",
+        "x-sd-auth-token: optional_stardog_auth_token_override"
       ]
     }
   }
 }
 ```
 See [Claude Remote MCP documentation](https://docs.anthropic.com/claude/remote-mcp) for more info.
+
+**Note:** The `x-sd-auth-token` header is an optional bearer token to override the default Stardog token for Voicebox. This is useful when connecting via SSO (e.g., Microsoft Entra) to supply a custom SSO token for Stardog authentication.
 
 ---
 

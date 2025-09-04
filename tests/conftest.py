@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
-from tools import ToolHandler
+from stardog_cloud_mcp.tools import ToolHandler
 
 
 @pytest.fixture

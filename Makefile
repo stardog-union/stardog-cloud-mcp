@@ -4,7 +4,7 @@
 PYTHON := python3
 VENV := $(PWD)/venv
 PIP := $(VENV)/bin/pip
-PYTHON_SRC := src
+PYTHON_SRC := stardog_cloud_mcp
 
 YELLOW := \033[1;33m
 GREEN := \033[1;32m
@@ -30,8 +30,6 @@ help:
 	@echo "  make docker-stop        Stop docker-compose services"
 	@echo "  make docker-clean       Remove Docker containers and images"
 	@echo ""
-	@echo "$(YELLOW)Environment Variables:$(NC)"
-	@echo "  STARDOG_CLOUD_TOKEN     Your Stardog Cloud API token (required for run targets)"
 
 # Setup and installation
 $(VENV):
