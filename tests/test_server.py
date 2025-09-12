@@ -1,0 +1,216 @@
+import os
+import subprocess
+import sys
+from unittest.mock import patch, AsyncMock
+
+import pytest
+from fastmcp import Client
+
+from stardog_cloud_mcp.constants import Headers
+from stardog_cloud_mcp.server import initialize_server, resolve_params
+
+
+@pytest.fixture
+def mcp_server():
+    with patch('stardog_cloud_mcp.server.StardogAsyncClient') as mock_stardog_client, \
+         patch('stardog_cloud_mcp.server.ToolHandler') as mock_tool_handler, \
+         patch('fastmcp.FastMCP.run') as mock_run:
+        mock_run.return_value = None  # Prevent running the server loop
+        # Setup mocks for ToolHandler methods
+        mock_handler_instance = mock_tool_handler.return_value
+        mock_handler_instance.handle_voicebox_settings = AsyncMock(return_value="Voicebox App Settings: test-vbx-app-1")
+        mock_handler_instance.handle_voicebox_ask = AsyncMock(return_value="Answer: Test answer for flight plan")
+        mock_handler_instance.handle_voicebox_generate_query = AsyncMock(return_value="SPARQL: SELECT * WHERE { ?flight ?hasPlan ?plan } | Show me all flights")
+        # Initialize the real server (this registers the real tools)
+        server = initialize_server(
+            endpoint="dummy-endpoint",
+            api_token="dummy-token",
+            client_id="test-client",
+            auth_token_override=None,
+            mode="stdio",
+            port=7000
+        )
+        # Return the server instance for FastMCP Client
+        return server
+
+@pytest.mark.asyncio
+async def test_voicebox_settings(mcp_server):
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("voicebox_settings", {})
+        print("Settings result:", result.data)
+        assert "Voicebox App Settings" in result.data
+        assert "test-vbx-app-1" in result.data
+
+@pytest.mark.asyncio
+async def test_voicebox_ask(mcp_server):
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("voicebox_ask", {"question": "What is the flight plan?"})
+        print("Ask result:", result.data)
+        assert "Answer" in result.data
+        assert "flight plan" in result.data
+
+@pytest.mark.asyncio
+async def test_voicebox_generate_query(mcp_server):
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("voicebox_generate_query", {"question": "Show me all flights"})
+        print("Generate query result:", result.data)
+        assert "SPARQL" in result.data or "SELECT" in result.data
+        assert "Show me all flights" in result.data
+
+@patch('fastmcp.FastMCP.run')
+@pytest.mark.asyncio
+async def test_voicebox_settings_missing_token(mock_run, monkeypatch):
+    async def raise_value_error(*args, **kwargs):
+        raise ValueError("API token is required")
+    monkeypatch.setattr("stardog_cloud_mcp.server.resolve_params", raise_value_error)
+    mock_run.return_value = None
+    server_instance = initialize_server(
+        endpoint="dummy-endpoint",
+        api_token="",
+        client_id="test-client",
+        auth_token_override=None,
+        mode="stdio",
+        port=7000
+    )
+    async with Client(server_instance) as client:
+        with pytest.raises(Exception):
+            await client.call_tool("voicebox_settings", {})
+
+@patch('fastmcp.FastMCP.run')
+@patch('stardog_cloud_mcp.server.ToolHandler')
+@pytest.mark.asyncio
+async def test_voicebox_settings_with_header(mock_tool_handler, mock_run, monkeypatch):
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {Headers.STARDOG_CLOUD_API_KEY: "header-token"})
+    mock_run.return_value = None
+    mock_handler_instance = mock_tool_handler.return_value
+    mock_handler_instance.handle_voicebox_settings = AsyncMock(return_value="Voicebox App Settings: test-vbx-app-1")
+    server_instance = initialize_server(
+        endpoint="dummy-endpoint",
+        api_token="arg-token",
+        client_id="test-client",
+        auth_token_override=None,
+        mode="stdio",
+        port=7000
+    )
+    async with Client(server_instance) as client:
+        result = await client.call_tool("voicebox_settings", {})
+        assert "Voicebox App Settings" in result.data
+
+@pytest.mark.asyncio
+async def test_resolve_headers_header_only(monkeypatch):
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {Headers.STARDOG_CLOUD_CLIENT_ID: "header-client"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_CLIENT_ID, "arg-client")
+    assert result == "header-client"
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_case_insensitive(monkeypatch):
+    # Test with different case variations
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"X-SDC-Client-ID": "header-client"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_CLIENT_ID, "arg-client")
+    assert result == "header-client"
+    
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"X-Sdc-Client-Id": "header-client2"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_CLIENT_ID, "arg-client")
+    assert result == "header-client2"
+
+@pytest.mark.asyncio
+async def test_resolve_headers_arg_only(monkeypatch):
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: None)
+    result = await resolve_params(Headers.STARDOG_CLOUD_CLIENT_ID, "arg-client")
+    assert result == "arg-client"
+
+@pytest.mark.asyncio
+async def test_resolve_headers_none(monkeypatch):
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: None)
+    result = await resolve_params(Headers.STARDOG_CLOUD_CLIENT_ID, None)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_auth_token_header_only(monkeypatch):
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {Headers.STARDOG_AUTH_TOKEN_OVERRIDE: "header-auth"})
+    result = await resolve_params(Headers.STARDOG_AUTH_TOKEN_OVERRIDE, None)
+    assert result == "header-auth"
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_auth_token_arg_only(monkeypatch):
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: None)
+    result = await resolve_params(Headers.STARDOG_AUTH_TOKEN_OVERRIDE, "arg-auth")
+    assert result == "arg-auth"
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_both_prefer_header(monkeypatch):
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {Headers.STARDOG_AUTH_TOKEN_OVERRIDE: "header-auth"})
+    result = await resolve_params(Headers.STARDOG_AUTH_TOKEN_OVERRIDE, "arg-auth")
+    assert result == "header-auth"
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_auth_token_none(monkeypatch):
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: None)
+    result = await resolve_params(Headers.STARDOG_AUTH_TOKEN_OVERRIDE, None)
+    assert result is None
+
+# CLI entrypoint coverage
+@patch('stardog_cloud_mcp.server.initialize_server', return_value=None)
+def test_main_entrypoint(mock_init):
+    script_path = os.path.join(os.path.dirname(__file__), '../stardog_cloud_mcp/server.py')
+    result = subprocess.run([
+        sys.executable, script_path,
+        '--endpoint', 'dummy-endpoint',
+        '--token', 'dummy-token',
+        '--client_id', 'test-client',
+        '--auth_token_override', 'test-auth-override',
+        '--mode', 'stdio',
+        '--port', '7000'
+    ], capture_output=True, text=True)
+    # Assert successful exit
+    assert result.returncode == 0
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_required_missing():
+    with pytest.raises(ValueError, match="API token is required"):
+        await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None, required=True, error_message="API token is required")
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_required_missing_with_empty_headers(monkeypatch):
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {})
+    with pytest.raises(ValueError, match="API token is required"):
+        await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None, required=True, error_message="API token is required")
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_api_token_case_insensitive(monkeypatch):
+    # Test with uppercase header
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"X-SDC-API-KEY": "token-upper"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None)
+    assert result == "token-upper"
+    
+    # Test with mixed case header
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"X-Sdc-Api-Key": "token-mixed"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None)
+    assert result == "token-mixed"
+
+
+@patch('fastmcp.FastMCP.run')
+def test_initialize_server_http_mode(mock_run):
+    mock_run.return_value = None
+    
+    server = initialize_server(
+        endpoint="http://test-endpoint",
+        api_token="test-token",
+        client_id="test-client",
+        auth_token_override=None,
+        mode="http",
+        port=8080
+    )
+    
+    mock_run.assert_called_once_with(transport="streamable-http", host="0.0.0.0", port=8080)
+    assert server is not None
+
+
