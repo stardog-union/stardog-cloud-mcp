@@ -45,7 +45,7 @@ install: $(VENV)
 
 # Run this before running tests or development tools
 .PHONY: install-dev
-install-dev:
+install-dev: $(VENV)
 	@echo "$(GREEN)Installing development dependencies...$(NC)"
 	@$(PIP) install -e ".[dev]"
 	@echo "$(GREEN)Development dependencies installed!$(NC)"

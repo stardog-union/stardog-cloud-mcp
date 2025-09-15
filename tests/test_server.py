@@ -197,6 +197,78 @@ async def test_resolve_headers_api_token_case_insensitive(monkeypatch):
     assert result == "token-mixed"
 
 
+@pytest.mark.asyncio
+async def test_resolve_headers_bearer_token(monkeypatch):
+    # Test Bearer token extraction
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"Authorization": "Bearer test-bearer-token"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None)
+    assert result == "test-bearer-token"
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_bearer_token_case_insensitive(monkeypatch):
+    # Test Bearer token with different case
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"authorization": "Bearer test-bearer-lower"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None)
+    assert result == "test-bearer-lower"
+    
+    # Test with AUTHORIZATION header
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"AUTHORIZATION": "Bearer test-bearer-upper"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None)
+    assert result == "test-bearer-upper"
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_bearer_token_with_arg(monkeypatch):
+    # Test Bearer token takes priority over command line argument
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"Authorization": "Bearer bearer-token"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, "arg-token")
+    assert result == "bearer-token"
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_priority_order(monkeypatch):
+    # Test full priority order: custom header > bearer token > arg
+    
+    # All three present: custom header wins
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {
+        "x-sdc-api-key": "custom-token",
+        "Authorization": "Bearer bearer-token"
+    })
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, "arg-token")
+    assert result == "custom-token"
+    
+    # Only bearer and arg: bearer wins
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {
+        "Authorization": "Bearer bearer-token"
+    })
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, "arg-token")
+    assert result == "bearer-token"
+    
+    # Only arg: arg is used
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, "arg-token")
+    assert result == "arg-token"
+
+
+@pytest.mark.asyncio
+async def test_resolve_headers_invalid_bearer_format(monkeypatch):
+    # Test that invalid Bearer format is ignored
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"Authorization": "InvalidBearer token"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None)
+    assert result is None
+    
+    # Test Bearer without space
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"Authorization": "Bearertoken"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None)
+    assert result is None
+    
+    # Test just "Bearer" without token
+    monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {"Authorization": "Bearer"})
+    result = await resolve_params(Headers.STARDOG_CLOUD_API_KEY, None)
+    assert result is None
+
+
 @patch('fastmcp.FastMCP.run')
 def test_initialize_server_http_mode(mock_run):
     mock_run.return_value = None
