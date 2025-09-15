@@ -1,5 +1,11 @@
 version: 2.1
 
+parameters:
+  run_internal_dist:
+    description: Flag to run internal dist pipeline.
+    type: boolean
+    default: false
+
 references:
   working_directory: &working_directory ~/app
 
@@ -128,7 +134,9 @@ workflows:
   # This workflow runs when pushing to main branch
   distribute_main:
     when:
-      equal: [ main, << pipeline.git.branch >> ]
+      or:
+        - equal: [ main, << pipeline.git.branch >> ]
+        - equal: [ true, << pipeline.parameters.run_internal_dist >> ]
     jobs:
       - setup
       - build:
