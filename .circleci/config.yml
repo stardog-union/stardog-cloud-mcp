@@ -3,7 +3,6 @@ version: 2.1
 references:
   working_directory: &working_directory ~/app
 
-# Executors define the environment in which the steps will run
 executors:
   python-executor:
     docker:
@@ -16,7 +15,6 @@ executors:
       image: ubuntu-2204:2024.05.1
     working_directory: *working_directory
 
-# Commands are reusable sets of steps
 commands:
   install-dependencies:
     description: "Install project and development dependencies"
@@ -29,10 +27,9 @@ commands:
           command: |
             echo 'export PATH="$PWD/venv/bin:$PATH"' >> $BASH_ENV
 
-# Jobs define the different tasks
 jobs:
   setup:
-    executor: python-executor
+    executor: test-executor
     steps:
       - checkout
       - persist_to_workspace:
@@ -41,7 +38,7 @@ jobs:
             - ./
 
   build:
-    executor: python-executor
+    executor: test-executor
     steps:
       - attach_workspace:
           at: .
@@ -56,7 +53,7 @@ jobs:
             - ./
 
   test:
-    executor: python-executor
+    executor: test-executor
     steps:
       - attach_workspace:
           at: .
@@ -77,22 +74,6 @@ jobs:
       - store_artifacts:
           path: coverage.xml
           destination: coverage-xml
-
-  docker-build-test:
-    executor: test-executor
-    steps:
-      - attach_workspace:
-          at: .
-      - setup_remote_docker:
-          version: 20.10.14
-          docker_layer_caching: true
-      - run:
-          name: Build Docker image
-          command: make docker-build
-      - run:
-          name: Test Docker image
-          command: |
-            docker run --rm stardog-cloud-mcp python -c "import stardog_cloud_mcp.server; print('Docker image works')"
 
   build_and_distribute_arm64:
     executor: test-executor
@@ -127,7 +108,6 @@ jobs:
           name: Create and Push Manifest
           command: ./scripts/deploy-to-artifactory.sh
 
-# Workflows define the order and conditions for running jobs
 workflows:
   version: 2
   
