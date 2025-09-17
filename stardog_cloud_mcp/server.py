@@ -60,6 +60,8 @@ async def resolve_params(
     Generic resolver for parameters that can come from headers or arguments.
     Headers take precedence over arguments when both are present.
 
+    For API tokens, also checks Authorization header for Bearer tokens.
+
     Args:
         header_name: Name of the header to look for
         arg_value: Value provided via command-line argument
@@ -74,6 +76,12 @@ async def resolve_params(
     """
     headers = get_http_headers()
     header_value = get_header_case_insensitive(headers, header_name)
+
+    # Special handling for API token - also check Authorization header
+    if header_name == Headers.STARDOG_CLOUD_API_KEY and not header_value:
+        auth_header = get_header_case_insensitive(headers, "Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            header_value = auth_header[7:]  # Remove "Bearer " prefix
 
     if header_value and arg_value:
         return header_value

@@ -1,0 +1,198 @@
+version: 2.1
+
+parameters:
+  run_internal_dist:
+    description: Flag to run internal dist pipeline.
+    type: boolean
+    default: false
+
+references:
+  working_directory: &working_directory ~/app
+
+executors:
+  python-executor:
+    docker:
+      - image: cimg/python:3.12
+    working_directory: *working_directory
+
+  test-executor:
+    machine:
+      docker_layer_caching: true
+      image: ubuntu-2204:2024.05.1
+    working_directory: *working_directory
+
+commands:
+  install-dependencies:
+    description: "Install project and development dependencies"
+    steps:
+      - run:
+          name: Install project and development dependencies
+          command: make install-dev
+      - run:
+          name: Set environment paths
+          command: |
+            echo 'export PATH="$PWD/venv/bin:$PATH"' >> $BASH_ENV
+
+jobs:
+  setup:
+    executor: test-executor
+    steps:
+      - checkout
+      - persist_to_workspace:
+          root: .
+          paths:
+            - ./
+
+  build:
+    executor: test-executor
+    steps:
+      - attach_workspace:
+          at: .
+      - install-dependencies
+      - run:
+          name: Verify installation
+          command: |
+            python -c "import stardog_cloud_mcp.server; print('Server module loaded successfully')"
+      - persist_to_workspace:
+          root: .
+          paths:
+            - ./
+
+  test:
+    executor: test-executor
+    steps:
+      - attach_workspace:
+          at: .
+      - install-dependencies
+      - run:
+          name: Run CI checks before tests
+          command: make ci
+      - run:
+          name: Run tests with coverage
+          command: |
+            mkdir -p test-results
+            pytest tests --cov=stardog_cloud_mcp --cov-report=html --cov-report=xml --junitxml=test-results/results.xml
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: htmlcov
+          destination: coverage-report
+      - store_artifacts:
+          path: coverage.xml
+          destination: coverage-xml
+
+  build_and_distribute_arm64:
+    executor: test-executor
+    description: Build and Distribute ARM64
+    machine:
+      image: ubuntu-2204:2023.07.1
+    resource_class: arm.medium
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Build and Push ARM64 Docker Image
+          command: ./scripts/deploy-to-artifactory.sh arm64
+
+  build_and_distribute_amd64:
+    executor: test-executor
+    description: Build and Distribute AMD64
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Build and Push AMD64 Docker Image
+          command: ./scripts/deploy-to-artifactory.sh amd64
+
+  build_and_distribute_manifest:
+    executor: test-executor
+    description: Create and Push Multi-Architecture Manifest
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: Create and Push Manifest
+          command: ./scripts/deploy-to-artifactory.sh
+
+workflows:
+  version: 2
+  
+  # This workflow runs for each github PR commit
+  build_and_test:
+    when:
+      not:
+        equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+    jobs:
+      - setup
+      - build:
+          requires:
+            - setup
+      - test:
+          requires:
+            - build
+
+  # This workflow runs when pushing to main branch
+  distribute_main:
+    when:
+      or:
+        - equal: [ main, << pipeline.git.branch >> ]
+        - equal: [ true, << pipeline.parameters.run_internal_dist >> ]
+    jobs:
+      - setup
+      - build:
+          requires:
+            - setup
+      - test:
+          requires:
+            - build
+      - build_and_distribute_arm64:
+          requires:
+            - test
+      - build_and_distribute_amd64:
+          requires:
+            - test
+      - build_and_distribute_manifest:
+          requires:
+            - build_and_distribute_arm64
+            - build_and_distribute_amd64
+
+  # This workflow runs when a tag is pushed
+  distribute_tagged:
+    when:
+      matches: { pattern: ".+" , value: << pipeline.git.tag >> }
+    jobs:
+      - setup:
+          filters:
+            tags:
+              only: /.*/
+      - build:
+          requires:
+            - setup
+          filters:
+            tags:
+              only: /.*/
+      - test:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /.*/
+      - build_and_distribute_arm64:
+          requires:
+            - test
+          filters:
+            tags:
+              only: /.*/
+      - build_and_distribute_amd64:
+          requires:
+            - test
+          filters:
+            tags:
+              only: /.*/
+      - build_and_distribute_manifest:
+          requires:
+            - build_and_distribute_arm64
+            - build_and_distribute_amd64
+          filters:
+            tags:
+              only: /.*/
