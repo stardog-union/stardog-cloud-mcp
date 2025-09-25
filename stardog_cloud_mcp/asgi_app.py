@@ -23,7 +23,6 @@ def create_asgi_app() -> object:
     client_id = os.getenv("SDC_CLIENT_ID", "VBX-APP")
     auth_token_override = os.getenv("SD_AUTH_TOKEN_OVERRIDE")
     port = int(os.getenv("SDC_PORT", "7000"))
-    auth_type = os.getenv("SDC_AUTH_TYPE", "bearer")
 
     # Initialize server in cloud mode
     server = initialize_server(
@@ -33,7 +32,6 @@ def create_asgi_app() -> object:
         auth_token_override=auth_token_override or "",
         port=port,
         deployment_mode="cloud",
-        auth_type=auth_type,
     )
 
     return server.http_app()
@@ -41,22 +39,3 @@ def create_asgi_app() -> object:
 
 # Create the ASGI app instance
 app = create_asgi_app()
-
-
-# Health check function for cloud deployment
-# def health_check() -> dict:
-#     """Simple health check function for monitoring."""
-#     return {"status": "healthy", "service": "stardog-cloud-mcp", "deployment": "cloud"}
-
-#
-# if __name__ == "__main__":
-#     import uvicorn
-#
-#     # Development server for testing
-#     uvicorn.run(
-#         "stardog_cloud_mcp.asgi_app:app",
-#         host="0.0.0.0",
-#         port=int(os.getenv("SDC_PORT", "7000")),
-#         workers=1,  # Single worker for development
-#         log_level="info",
-#     )

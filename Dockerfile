@@ -10,7 +10,6 @@ ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     SDC_ENDPOINT=https://cloud.stardog.com/api \
     SDC_DEPLOYMENT_MODE=launchpad \
-    SDC_AUTH_TYPE=none
 
 # Copy project files
 COPY pyproject.toml ./

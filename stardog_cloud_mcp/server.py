@@ -107,7 +107,6 @@ def initialize_server(
     auth_token_override: str,
     port: int,
     deployment_mode: str = "launchpad",
-    auth_type: Optional[str] = None,
 ):
     """
     Start the Stardog Cloud MCP server using FastMCP.
@@ -116,23 +115,7 @@ def initialize_server(
 
     logger.info(f"Starting Stardog Cloud MCP server ⭐🐕☁️ in {deployment_mode} mode")
 
-    # Configure authentication if needed
-    auth_provider = None
-    if config["auth_enabled"] and auth_type and auth_type != "none":
-        from fastmcp.server.auth import StaticTokenVerifier
-
-        if auth_type == "bearer" and api_token:
-            # Use the existing API token as bearer token
-            auth_provider = StaticTokenVerifier(
-                tokens={api_token: {"client_id": client_id, "scopes": ["voicebox"]}},
-                required_scopes=["voicebox"],
-            )
-            logger.info("Configured bearer token authentication")
-        elif auth_type == "jwt":
-            # JWT verification for production environments
-            logger.info("JWT authentication configured (not implemented yet)")
-
-    server = FastMCP("stardog-cloud-mcp", auth=auth_provider)
+    server = FastMCP("stardog-cloud-mcp")
 
     # Enable stateless HTTP for multi-worker scaling
     if deployment_mode == "cloud":
@@ -266,7 +249,6 @@ def initialize_server(
                 "timestamp": int(time.time()),
                 "deployment_mode": deployment_mode,
                 "transport": config["transport"],
-                "auth_enabled": config["auth_enabled"],
             }
         )
 
@@ -341,13 +323,6 @@ def main():
         help="Deployment mode: development (stdio), launchpad (streamable-http), cloud (asgi) (default: %(default)s)",
     )
 
-    parser.add_argument(
-        "--auth",
-        choices=["none", "bearer", "jwt", "oauth"],
-        default=os.getenv("SDC_AUTH_TYPE", "none"),
-        help="Authentication type for production deployment (default: %(default)s)",
-    )
-
     args = parser.parse_args()
 
     try:
@@ -358,7 +333,6 @@ def main():
             args.auth_token_override,
             args.port,
             args.deployment,
-            args.auth,
         )
     except KeyboardInterrupt:  # pragma: no cover
         logger.info("Caught manual interrupt, server shutting down...")
