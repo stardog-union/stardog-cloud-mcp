@@ -1,13 +1,97 @@
+version: '3.8'
+
 services:
-  stardog-cloud-mcp:
-    image: stardog-cloud-mcp
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - 7001:7000
+  # Development mode - STDIO transport (for local testing)
+  mcp-dev:
+    build: .
     environment:
-      - SDC_API_TOKEN
-      - SDC_ENDPOINT
+      - SDC_DEPLOYMENT_MODE=development
+      - SDC_API_TOKEN=${SDC_API_TOKEN}
+      - SDC_ENDPOINT=${SDC_ENDPOINT:-https://cloud.stardog.com/api}
+      - SDC_CLIENT_ID=${SDC_CLIENT_ID:-VBX-APP}
     volumes:
-      - ./:/app
+      - ./logs:/app/logs
+    profiles:
+      - development
+
+  # Launchpad mode - HTTP transport (current default)
+  mcp-launchpad:
+    build: .
+    environment:
+      - SDC_DEPLOYMENT_MODE=launchpad
+      - SDC_API_TOKEN=${SDC_API_TOKEN}
+      - SDC_ENDPOINT=${SDC_ENDPOINT:-https://cloud.stardog.com/api}
+      - SDC_CLIENT_ID=${SDC_CLIENT_ID:-VBX-APP}
+      - SDC_PORT=7000
+      - SDC_AUTH_TYPE=${SDC_AUTH_TYPE:-none}
+    ports:
+      - "7000:7000"
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    profiles:
+      - launchpad
+      - default
+
+  # Cloud mode - ASGI with multiple workers (production)
+  mcp-cloud:
+    build: .
+    environment:
+      - SDC_DEPLOYMENT_MODE=cloud
+      - SDC_API_TOKEN=${SDC_API_TOKEN}
+      - SDC_ENDPOINT=${SDC_ENDPOINT:-https://cloud.stardog.com/api}
+      - SDC_CLIENT_ID=${SDC_CLIENT_ID:-VBX-APP}
+      - SDC_PORT=7000
+      - SDC_WORKERS=${SDC_WORKERS:-4}
+      - SDC_AUTH_TYPE=${SDC_AUTH_TYPE:-bearer}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    profiles:
+      - cloud
+      - production
+
+  # Nginx reverse proxy for cloud deployment (optional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - mcp-cloud
+    profiles:
+      - cloud
+      - production
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  logs:
+    driver: local

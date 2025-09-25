@@ -2,15 +2,21 @@ import argparse
 import logging
 import os
 import sys
+import time
 from functools import wraps
-from typing import Optional, cast
+from typing import Annotated, Optional, cast
 
+import fastmcp
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_context, get_http_headers
+from fastmcp.server.middleware.logging import LoggingMiddleware
 from stardog.cloud.client import AsyncClient as StardogAsyncClient
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from stardog_cloud_mcp import __version__
 from stardog_cloud_mcp.constants import Headers
+from stardog_cloud_mcp.deployment_config import deployment_configs
 from stardog_cloud_mcp.tools import ToolHandler
 
 logger = logging.getLogger("stardog_cloud_mcp")
@@ -96,17 +102,50 @@ async def resolve_params(
 
 def initialize_server(
     endpoint: str,
-    api_token: str,
+    api_token: str | None,
     client_id: str,
     auth_token_override: str,
-    mode: str,
     port: int,
+    deployment_mode: str = "launchpad",
+    auth_type: Optional[str] = None,
 ):
     """
     Start the Stardog Cloud MCP server using FastMCP.
     """
-    logger.info("Starting Stardog Cloud MCP server ⭐🐕☁️")
-    server = FastMCP("stardog-cloud-mcp")
+    config = deployment_configs.get(deployment_mode, deployment_configs["launchpad"])
+
+    logger.info(f"Starting Stardog Cloud MCP server ⭐🐕☁️ in {deployment_mode} mode")
+
+    # Configure authentication if needed
+    auth_provider = None
+    if config["auth_enabled"] and auth_type and auth_type != "none":
+        from fastmcp.server.auth import StaticTokenVerifier
+
+        if auth_type == "bearer" and api_token:
+            # Use the existing API token as bearer token
+            auth_provider = StaticTokenVerifier(
+                tokens={api_token: {"client_id": client_id, "scopes": ["voicebox"]}},
+                required_scopes=["voicebox"],
+            )
+            logger.info("Configured bearer token authentication")
+        elif auth_type == "jwt":
+            # JWT verification for production environments
+            logger.info("JWT authentication configured (not implemented yet)")
+
+    server = FastMCP("stardog-cloud-mcp", auth=auth_provider)
+
+    # Enable stateless HTTP for multi-worker scaling
+    if deployment_mode == "cloud":
+        fastmcp.settings.stateless_http = True
+        logger.info("Enabled stateless HTTP for multi-worker support")
+
+    # Add MCP request logging if enabled
+    if os.getenv("SDC_MCP_LOGGING", "false").lower() == "true":
+        server.add_middleware(
+            LoggingMiddleware(logger, include_payloads=True, max_payload_length=1000)
+        )
+        logger.info("MCP request logging enabled")
+
     cloud_client = StardogAsyncClient(base_url=endpoint)
     tool_handler = ToolHandler(cloud_client)
 
@@ -141,8 +180,12 @@ def initialize_server(
     )
     @tool_logging("voicebox_ask")
     async def voicebox_ask(
-        question: str,
-        conversation_id: Optional[str] = None,
+        question: Annotated[str, "Natural language question to ask Voicebox"],
+        conversation_id: Annotated[
+            Optional[str],
+            "conversation_id is to be left blank for new conversation (system creates one automatically), "
+            "but needs to be supplied for multi-turn conversations to maintain the same conversation history/thread",
+        ] = None,
     ) -> str:
         """
         Ask a question to Voicebox and get a natural language response
@@ -176,8 +219,14 @@ def initialize_server(
     )
     @tool_logging("voicebox_generate_query")
     async def voicebox_generate_query(
-        question: str,
-        conversation_id: Optional[str] = None,
+        question: Annotated[
+            str, "Natural language question to generate SPARQL query from"
+        ],
+        conversation_id: Annotated[
+            Optional[str],
+            "conversation_id is to be left blank for new conversation (system creates one automatically), "
+            "but needs to be supplied for multi-turn conversations to maintain the same conversation history/thread",
+        ] = None,
     ) -> str:
         """
         Generate a SPARQL query from a natural language question using Voicebox
@@ -205,13 +254,35 @@ def initialize_server(
             stardog_auth_token_override=resolved_auth_token_override,
         )
 
-    if mode == "http":
+    # Add health check endpoint
+    @server.custom_route("/health", methods=["GET"])
+    async def health_check(request: Request) -> JSONResponse:
+        """Health check endpoint for monitoring"""
+        return JSONResponse(
+            {
+                "status": "healthy",
+                "service": "stardog-cloud-mcp",
+                "version": __version__,
+                "timestamp": int(time.time()),
+                "deployment_mode": deployment_mode,
+                "transport": config["transport"],
+                "auth_enabled": config["auth_enabled"],
+            }
+        )
+
+    if deployment_mode == "cloud":
+        # For cloud deployment, return the server instance for ASGI
+        logger.info("☁️  Cloud deployment mode - server configured for ASGI")
+        return server
+    elif deployment_mode == "launchpad":
         logger.info(
             f"\U0001f310 Starting MCP server in HTTP mode at http://localhost:{port}"
         )
+        logger.info(f"Health check available at: http://localhost:{port}/health")
+        logger.info(f"Server info available at: http://localhost:{port}/info")
         server.run(transport="streamable-http", host="0.0.0.0", port=port)
-    else:
-        logger.info("\U0001f9ea Starting MCP server in STDIO (local) mode")
+    else:  # development mode
+        logger.info("\U0001f9ea Starting MCP server in STDIO (development) mode")
         server.run(transport="stdio")
     return server
 
@@ -220,7 +291,7 @@ def main():
     """Main entry point for the Stardog Cloud MCP Server."""
     parser = argparse.ArgumentParser(
         description="Stardog Cloud MCP Server - Model Context Protocol server for Stardog Voicebox",
-        epilog="Environment variables: SDC_ENDPOINT, SDC_API_TOKEN, SDC_MCP_SERVER_MODE, SD_AUTH_TOKEN_OVERRIDE",
+        epilog="Environment variables: SDC_ENDPOINT, SDC_API_TOKEN, SDC_DEPLOYMENT_MODE, SD_AUTH_TOKEN_OVERRIDE",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -240,13 +311,6 @@ def main():
         type=str,
         help="Stardog Cloud API token (required, can also use SDC_API_TOKEN env var)",
         default=os.getenv("SDC_API_TOKEN"),
-    )
-
-    parser.add_argument(
-        "--mode",
-        choices=["stdio", "http"],
-        default=os.getenv("SDC_MCP_SERVER_MODE", "stdio"),
-        help="Server mode: stdio for local Claude Desktop, http for remote clients (default: %(default)s)",
     )
 
     parser.add_argument(
@@ -270,6 +334,20 @@ def main():
         default=os.getenv("SD_AUTH_TOKEN_OVERRIDE"),
     )
 
+    parser.add_argument(
+        "--deployment",
+        choices=["development", "launchpad", "cloud"],
+        default=os.getenv("SDC_DEPLOYMENT_MODE", "launchpad"),
+        help="Deployment mode: development (stdio), launchpad (streamable-http), cloud (asgi) (default: %(default)s)",
+    )
+
+    parser.add_argument(
+        "--auth",
+        choices=["none", "bearer", "jwt", "oauth"],
+        default=os.getenv("SDC_AUTH_TYPE", "none"),
+        help="Authentication type for production deployment (default: %(default)s)",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -278,8 +356,9 @@ def main():
             args.token,
             args.client_id,
             args.auth_token_override,
-            args.mode,
             args.port,
+            args.deployment,
+            args.auth,
         )
     except KeyboardInterrupt:  # pragma: no cover
         logger.info("Caught manual interrupt, server shutting down...")
