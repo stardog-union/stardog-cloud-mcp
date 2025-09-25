@@ -27,8 +27,8 @@ def mcp_server():
             api_token="dummy-token",
             client_id="test-client",
             auth_token_override=None,
-            mode="stdio",
-            port=7000
+            port=7000,
+            deployment_mode="development"
         )
         # Return the server instance for FastMCP Client
         return server
@@ -69,8 +69,8 @@ async def test_voicebox_settings_missing_token(mock_run, monkeypatch):
         api_token="",
         client_id="test-client",
         auth_token_override=None,
-        mode="stdio",
-        port=7000
+        port=7000,
+        deployment_mode="development"
     )
     async with Client(server_instance) as client:
         with pytest.raises(Exception):
@@ -89,8 +89,8 @@ async def test_voicebox_settings_with_header(mock_tool_handler, mock_run, monkey
         api_token="arg-token",
         client_id="test-client",
         auth_token_override=None,
-        mode="stdio",
-        port=7000
+        port=7000,
+        deployment_mode="development"
     )
     async with Client(server_instance) as client:
         result = await client.call_tool("voicebox_settings", {})
@@ -164,7 +164,7 @@ def test_main_entrypoint(mock_init):
         '--token', 'dummy-token',
         '--client_id', 'test-client',
         '--auth_token_override', 'test-auth-override',
-        '--mode', 'stdio',
+        '--deployment', 'development',
         '--port', '7000'
     ], capture_output=True, text=True)
     # Assert successful exit
@@ -272,17 +272,111 @@ async def test_resolve_headers_invalid_bearer_format(monkeypatch):
 @patch('fastmcp.FastMCP.run')
 def test_initialize_server_http_mode(mock_run):
     mock_run.return_value = None
-    
+
     server = initialize_server(
         endpoint="http://test-endpoint",
         api_token="test-token",
         client_id="test-client",
         auth_token_override=None,
-        mode="http",
-        port=8080
+        port=8080,
+        deployment_mode="launchpad"
     )
-    
+
     mock_run.assert_called_once_with(transport="streamable-http", host="0.0.0.0", port=8080)
     assert server is not None
+
+
+@patch('fastmcp.FastMCP.run')
+@patch('fastmcp.settings')
+def test_initialize_server_cloud_mode(mock_settings, mock_run):
+    mock_run.return_value = None
+
+    server = initialize_server(
+        endpoint="http://test-endpoint",
+        api_token="test-token",
+        client_id="test-client",
+        auth_token_override=None,
+        port=8080,
+        deployment_mode="cloud"
+    )
+
+    # Should not call run() in cloud mode, just return server
+    mock_run.assert_not_called()
+    # Should enable stateless HTTP for cloud mode
+    assert mock_settings.stateless_http == True
+    assert server is not None
+
+
+@patch('fastmcp.FastMCP.run')
+@patch('stardog_cloud_mcp.server.os.getenv')
+def test_initialize_server_with_mcp_logging(mock_getenv, mock_run):
+    mock_run.return_value = None
+    # Mock environment variable to enable MCP logging
+    mock_getenv.side_effect = lambda key, default=None: "true" if key == "SDC_MCP_LOGGING" else default
+
+    with patch('stardog_cloud_mcp.server.LoggingMiddleware') as mock_middleware:
+        server = initialize_server(
+            endpoint="http://test-endpoint",
+            api_token="test-token",
+            client_id="test-client",
+            auth_token_override=None,
+            port=8080,
+            deployment_mode="development"
+        )
+
+        # Should add logging middleware when SDC_MCP_LOGGING=true
+        mock_middleware.assert_called_once()
+        assert server is not None
+
+
+@patch('fastmcp.FastMCP.run')
+def test_initialize_server_development_mode(mock_run):
+    mock_run.return_value = None
+
+    server = initialize_server(
+        endpoint="http://test-endpoint",
+        api_token="test-token",
+        client_id="test-client",
+        auth_token_override=None,
+        port=8080,
+        deployment_mode="development"
+    )
+
+    mock_run.assert_called_once_with(transport="stdio")
+    assert server is not None
+
+
+@patch('fastmcp.FastMCP.run')
+@patch('stardog_cloud_mcp.server.time.time', return_value=1234567890)
+@pytest.mark.asyncio
+async def test_health_check_endpoint(mock_time, mock_run):
+    """Test the health check endpoint functionality"""
+    from starlette.testclient import TestClient
+
+    mock_run.return_value = None
+
+    server = initialize_server(
+        endpoint="http://test-endpoint",
+        api_token="test-token",
+        client_id="test-client",
+        auth_token_override=None,
+        port=8080,
+        deployment_mode="cloud"
+    )
+
+    # Get the HTTP app from the server
+    app = server.http_app()
+    client = TestClient(app)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    json_response = response.json()
+
+    assert json_response["status"] == "healthy"
+    assert json_response["service"] == "stardog-cloud-mcp"
+    assert json_response["timestamp"] == 1234567890
+    assert json_response["deployment_mode"] == "cloud"
+    assert json_response["transport"] == "asgi"
 
 

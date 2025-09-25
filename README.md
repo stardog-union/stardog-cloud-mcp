@@ -54,12 +54,8 @@ You can run the server locally using either Docker or Python/uv:
 
 ### Setting up the Server
 
-**Clone the repository into your system and run with Python/uv. Use the provisioned make commands for development and installation.**
-
-```bash
-make help # help on available commands
-make install # setups your venv and installs dependencies
-```
+**Clone the repository into your system and ensure you have Python and uv set up to proceed with local integration.**  
+For local development, you can use the provisioned make commands. See [Local Development](#local-development) for more details.
 > You can run `which uv` to find the path to the `uv` command. This is the path you should use for the `command` field in the configuration.
 >```bash
 >$ which uv
