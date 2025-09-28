@@ -122,10 +122,11 @@ Use Cursor's MCP integration to connect to your local server by configuring the 
 ---
 
 ## Remote Setup (Beta)
+> [!NOTE]  
+> Currently, remote MCP is supported for Stardog Launchpad, which is the on-premise offering of Stardog Cloud. Please connect with Stardog support to enable remote MCP for your Launchpad deployment.
 
 You can configure remote access to the Stardog Cloud MCP server for your AI agents or even tools like Cursor and Claude Desktop. For this, the Stardog Cloud MCP server needs to be running and accessible over the network.  
-> [!NOTE]  
-> The MCP server requires your Voicebox API token for authentication. This can be provisioned both as a custom header against the key `x-sdc-api-key` or as a Bearer token in your HTTP requests.
+The MCP server requires your Voicebox API token for authentication. This can be provisioned both as a custom header against the key `x-sdc-api-key` or as a Bearer token in your HTTP requests.
 
 ### Integrating with Cursor
 
