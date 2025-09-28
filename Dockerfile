@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir uv
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     SDC_ENDPOINT=https://cloud.stardog.com/api \
-    SDC_DEPLOYMENT_MODE=launchpad \
+    SDC_DEPLOYMENT_MODE=launchpad
 
 # Copy project files
 COPY pyproject.toml ./
@@ -24,7 +24,7 @@ RUN uv pip install --system . && \
 EXPOSE 7000 8000
 
 # Create entrypoint script for flexible deployment
-COPY docker-entrypoint.sh /usr/local/bin/
+COPY scripts/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Use flexible entrypoint

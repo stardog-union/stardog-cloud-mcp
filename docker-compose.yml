@@ -9,6 +9,6 @@ services:
     environment:
       - SDC_API_TOKEN
       - SDC_ENDPOINT
-      - SDC_DEPLOYMENT_MODE=development
+      - SDC_DEPLOYMENT_MODE=launchpad
     volumes:
       - ./:/app

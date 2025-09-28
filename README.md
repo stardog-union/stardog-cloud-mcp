@@ -77,6 +77,8 @@ Use the following sample json to make Claude Desktop to point to your local MCP 
                 "/path/to/stardog-cloud-mcp",
                 "run",
                 "stardog-cloud-mcp",
+                "--deployment",
+                "local",
                 "--token",
                 "your_stardog_cloud_voicebox_api_token",
                 "--client_id",
@@ -105,6 +107,8 @@ Use Cursor's MCP integration to connect to your local server by configuring the 
         "/path/to/stardog-cloud-mcp",
         "run",
         "stardog-cloud-mcp",
+        "--deployment",
+        "local",
         "--token",
         "your_stardog_cloud_voicebox_api_token",
         "--client_id",
@@ -119,8 +123,9 @@ Use Cursor's MCP integration to connect to your local server by configuring the 
 
 ## Remote Setup (Beta)
 
-You can configure remote MCP access for tools like Cursor and Claude Desktop. 
-The server requires your Voicebox API token for authentication. This needs to be provisioned in the headers against the key `x-sdc-api-key`.
+You can configure remote access to the Stardog Cloud MCP server for your AI agents or even tools like Cursor and Claude Desktop. For this, the Stardog Cloud MCP server needs to be running and accessible over the network.  
+> [!NOTE]  
+> The MCP server requires your Voicebox API token for authentication. This can be provisioned both as a custom header against the key `x-sdc-api-key` or as a Bearer token in your HTTP requests.
 
 ### Integrating with Cursor
 

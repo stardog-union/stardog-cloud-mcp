@@ -115,12 +115,12 @@ def initialize_server(
 
     logger.info(f"Starting Stardog Cloud MCP server ⭐🐕☁️ in {deployment_mode} mode")
 
-    server = FastMCP("stardog-cloud-mcp")
-
-    # Enable stateless HTTP for multi-worker scaling
+    # Enable stateless HTTP for multi-worker scaling BEFORE creating server
     if deployment_mode == "cloud":
         fastmcp.settings.stateless_http = True
         logger.info("Enabled stateless HTTP for multi-worker support")
+
+    server = FastMCP("stardog-cloud-mcp")
 
     # Add MCP request logging if enabled
     if os.getenv("SDC_MCP_LOGGING", "false").lower() == "true":
@@ -263,8 +263,8 @@ def initialize_server(
         logger.info(f"Health check available at: http://localhost:{port}/health")
         logger.info(f"Server info available at: http://localhost:{port}/info")
         server.run(transport="streamable-http", host="0.0.0.0", port=port)
-    else:  # development mode
-        logger.info("\U0001f9ea Starting MCP server in STDIO (development) mode")
+    else:  # local mode
+        logger.info("\U0001f9ea Starting MCP server in STDIO (local) mode")
         server.run(transport="stdio")
     return server
 
@@ -318,9 +318,9 @@ def main():
 
     parser.add_argument(
         "--deployment",
-        choices=["development", "launchpad", "cloud"],
+        choices=["local", "launchpad", "cloud"],
         default=os.getenv("SDC_DEPLOYMENT_MODE", "launchpad"),
-        help="Deployment mode: development (stdio), launchpad (streamable-http), cloud (asgi) (default: %(default)s)",
+        help="Deployment mode: local (stdio), launchpad (streamable-http), cloud (asgi) (default: %(default)s)",
     )
 
     args = parser.parse_args()

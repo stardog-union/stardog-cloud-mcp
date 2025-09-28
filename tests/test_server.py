@@ -28,7 +28,7 @@ def mcp_server():
             client_id="test-client",
             auth_token_override=None,
             port=7000,
-            deployment_mode="development"
+            deployment_mode="local"
         )
         # Return the server instance for FastMCP Client
         return server
@@ -70,7 +70,7 @@ async def test_voicebox_settings_missing_token(mock_run, monkeypatch):
         client_id="test-client",
         auth_token_override=None,
         port=7000,
-        deployment_mode="development"
+        deployment_mode="local"
     )
     async with Client(server_instance) as client:
         with pytest.raises(Exception):
@@ -90,7 +90,7 @@ async def test_voicebox_settings_with_header(mock_tool_handler, mock_run, monkey
         client_id="test-client",
         auth_token_override=None,
         port=7000,
-        deployment_mode="development"
+        deployment_mode="local"
     )
     async with Client(server_instance) as client:
         result = await client.call_tool("voicebox_settings", {})
@@ -164,7 +164,7 @@ def test_main_entrypoint(mock_init):
         '--token', 'dummy-token',
         '--client_id', 'test-client',
         '--auth_token_override', 'test-auth-override',
-        '--deployment', 'development',
+        '--deployment', 'local',
         '--port', '7000'
     ], capture_output=True, text=True)
     # Assert successful exit
@@ -321,7 +321,7 @@ def test_initialize_server_with_mcp_logging(mock_getenv, mock_run):
             client_id="test-client",
             auth_token_override=None,
             port=8080,
-            deployment_mode="development"
+            deployment_mode="local"
         )
 
         # Should add logging middleware when SDC_MCP_LOGGING=true
@@ -330,7 +330,7 @@ def test_initialize_server_with_mcp_logging(mock_getenv, mock_run):
 
 
 @patch('fastmcp.FastMCP.run')
-def test_initialize_server_development_mode(mock_run):
+def test_initialize_server_local_mode(mock_run):
     mock_run.return_value = None
 
     server = initialize_server(

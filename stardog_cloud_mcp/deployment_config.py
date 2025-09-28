@@ -1,7 +1,7 @@
 # Deployment configuration for Stardog Cloud MCP server
 
 deployment_configs = {
-    "development": {
+    "local": {
         "transport": "stdio",
         "log_level": "DEBUG",
         "workers": 1,
