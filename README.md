@@ -54,12 +54,8 @@ You can run the server locally using either Docker or Python/uv:
 
 ### Setting up the Server
 
-**Clone the repository into your system and run with Python/uv. Use the provisioned make commands for development and installation.**
-
-```bash
-make help # help on available commands
-make install # setups your venv and installs dependencies
-```
+**Clone the repository into your system and ensure you have Python and uv set up to proceed with local integration.**  
+For local development, you can use the provisioned make commands. See [Local Development](#local-development) for more details.
 > You can run `which uv` to find the path to the `uv` command. This is the path you should use for the `command` field in the configuration.
 >```bash
 >$ which uv
@@ -81,6 +77,8 @@ Use the following sample json to make Claude Desktop to point to your local MCP 
                 "/path/to/stardog-cloud-mcp",
                 "run",
                 "stardog-cloud-mcp",
+                "--deployment",
+                "local",
                 "--token",
                 "your_stardog_cloud_voicebox_api_token",
                 "--client_id",
@@ -109,6 +107,8 @@ Use Cursor's MCP integration to connect to your local server by configuring the 
         "/path/to/stardog-cloud-mcp",
         "run",
         "stardog-cloud-mcp",
+        "--deployment",
+        "local",
         "--token",
         "your_stardog_cloud_voicebox_api_token",
         "--client_id",
@@ -122,9 +122,11 @@ Use Cursor's MCP integration to connect to your local server by configuring the 
 ---
 
 ## Remote Setup (Beta)
+> [!NOTE]  
+> Currently, remote MCP is supported for Stardog Launchpad, which is the on-premise offering of Stardog Cloud. Please connect with Stardog support to enable remote MCP for your Launchpad deployment.
 
-You can configure remote MCP access for tools like Cursor and Claude Desktop. 
-The server requires your Voicebox API token for authentication. This needs to be provisioned in the headers against the key `x-sdc-api-key`.
+You can configure remote access to the Stardog Cloud MCP server for your AI agents or even tools like Cursor and Claude Desktop. For this, the Stardog Cloud MCP server needs to be running and accessible over the network.  
+The MCP server requires your Voicebox API token for authentication. This can be provisioned both as a custom header against the key `x-sdc-api-key` or as a Bearer token in your HTTP requests.
 
 ### Integrating with Cursor
 
