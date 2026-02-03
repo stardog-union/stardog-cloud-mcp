@@ -9,5 +9,6 @@ services:
     environment:
       - SDC_API_TOKEN
       - SDC_ENDPOINT
+      - SDC_TIMEOUT
     volumes:
       - ./:/app
