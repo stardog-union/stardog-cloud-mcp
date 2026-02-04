@@ -101,13 +101,17 @@ def initialize_server(
     auth_token_override: str,
     mode: str,
     port: int,
+    timeout: Optional[float] = None,
 ):
     """
     Start the Stardog Cloud MCP server using FastMCP.
     """
     logger.info("Starting Stardog Cloud MCP server ⭐🐕☁️")
     server = FastMCP("stardog-cloud-mcp")
-    cloud_client = StardogAsyncClient(base_url=endpoint)
+    if timeout is not None:
+        cloud_client = StardogAsyncClient(base_url=endpoint, timeout=timeout)
+    else:
+        cloud_client = StardogAsyncClient(base_url=endpoint)
     tool_handler = ToolHandler(cloud_client)
 
     @server.tool(
@@ -220,7 +224,7 @@ def main():
     """Main entry point for the Stardog Cloud MCP Server."""
     parser = argparse.ArgumentParser(
         description="Stardog Cloud MCP Server - Model Context Protocol server for Stardog Voicebox",
-        epilog="Environment variables: SDC_ENDPOINT, SDC_API_TOKEN, SDC_MCP_SERVER_MODE, SD_AUTH_TOKEN_OVERRIDE",
+        epilog="Environment variables: SDC_ENDPOINT, SDC_API_TOKEN, SDC_TIMEOUT, SDC_MCP_SERVER_MODE, SD_AUTH_TOKEN_OVERRIDE",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -270,6 +274,13 @@ def main():
         default=os.getenv("SD_AUTH_TOKEN_OVERRIDE"),
     )
 
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=float(os.getenv("SDC_TIMEOUT")) if os.getenv("SDC_TIMEOUT") else None,
+        help="Request timeout in seconds for Stardog Cloud API calls",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -280,6 +291,7 @@ def main():
             args.auth_token_override,
             args.mode,
             args.port,
+            args.timeout,
         )
     except KeyboardInterrupt:  # pragma: no cover
         logger.info("Caught manual interrupt, server shutting down...")

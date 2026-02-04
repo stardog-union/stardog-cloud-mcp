@@ -28,7 +28,7 @@ def mcp_server():
             client_id="test-client",
             auth_token_override=None,
             mode="stdio",
-            port=7000
+            port=7000,
         )
         # Return the server instance for FastMCP Client
         return server
@@ -70,7 +70,7 @@ async def test_voicebox_settings_missing_token(mock_run, monkeypatch):
         client_id="test-client",
         auth_token_override=None,
         mode="stdio",
-        port=7000
+        port=7000,
     )
     async with Client(server_instance) as client:
         with pytest.raises(Exception):
@@ -90,7 +90,7 @@ async def test_voicebox_settings_with_header(mock_tool_handler, mock_run, monkey
         client_id="test-client",
         auth_token_override=None,
         mode="stdio",
-        port=7000
+        port=7000,
     )
     async with Client(server_instance) as client:
         result = await client.call_tool("voicebox_settings", {})
@@ -272,17 +272,56 @@ async def test_resolve_headers_invalid_bearer_format(monkeypatch):
 @patch('fastmcp.FastMCP.run')
 def test_initialize_server_http_mode(mock_run):
     mock_run.return_value = None
-    
+
     server = initialize_server(
         endpoint="http://test-endpoint",
         api_token="test-token",
         client_id="test-client",
         auth_token_override=None,
         mode="http",
-        port=8080
+        port=8080,
     )
-    
+
     mock_run.assert_called_once_with(transport="streamable-http", host="0.0.0.0", port=8080)
+    assert server is not None
+
+
+@patch('fastmcp.FastMCP.run')
+@patch('stardog_cloud_mcp.server.StardogAsyncClient')
+def test_initialize_server_custom_timeout(mock_stardog_client, mock_run):
+    mock_run.return_value = None
+
+    server = initialize_server(
+        endpoint="http://test-endpoint",
+        api_token="test-token",
+        client_id="test-client",
+        auth_token_override=None,
+        mode="stdio",
+        port=7000,
+        timeout=120.0,
+    )
+
+    mock_stardog_client.assert_called_once_with(base_url="http://test-endpoint", timeout=120.0)
+    assert server is not None
+
+
+@patch('fastmcp.FastMCP.run')
+@patch('stardog_cloud_mcp.server.StardogAsyncClient')
+def test_initialize_server_default_timeout(mock_stardog_client, mock_run):
+    """Test that when no timeout is specified, it uses underlying client default."""
+    mock_run.return_value = None
+
+    server = initialize_server(
+        endpoint="http://test-endpoint",
+        api_token="test-token",
+        client_id="test-client",
+        auth_token_override=None,
+        mode="stdio",
+        port=7000,
+    )
+
+    # Should only pass base_url, not timeout (let underlying client use its default)
+    mock_stardog_client.assert_called_once_with(base_url="http://test-endpoint")
     assert server is not None
 
 
