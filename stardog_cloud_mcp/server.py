@@ -144,10 +144,17 @@ def initialize_server(
         annotations={"title": "Voicebox: Ask Questions", "readOnlyHint": True},
     )
     @tool_logging("voicebox_ask")
-    async def voicebox_ask(
-        question: str,
-        conversation_id: Optional[str] = None,
-    ) -> str:
+   # async def voicebox_ask(
+    #    question: str,
+     #   conversation_id: Optional[str] = None,
+    #) -> str:
+
+     # async def voicebox_ask(
+    #    question: str,
+     #   conversation_id: Optional[str] = None,
+    #) -> str:
+    async def voicebox_ask(question: str, conversation_id: str = "") -> str:
+    conversation_id = conversation_id.strip() or None
         """
         Ask a question to Voicebox and get a natural language response
         """
@@ -179,10 +186,12 @@ def initialize_server(
         annotations={"title": "Voicebox: Generate SPARQL", "readOnlyHint": True},
     )
     @tool_logging("voicebox_generate_query")
-    async def voicebox_generate_query(
-        question: str,
-        conversation_id: Optional[str] = None,
-    ) -> str:
+   # async def voicebox_generate_query(
+   #     question: str,
+     #   conversation_id: Optional[str] = None,
+   # ) -> str:
+async def voicebox_generate_query(question: str, conversation_id: str = "") -> str:
+conversation_id = conversation_id.strip() or None
         """
         Generate a SPARQL query from a natural language question using Voicebox
         """
