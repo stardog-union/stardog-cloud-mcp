@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 
 from stardog.cloud.client import BaseClient
-from stardog.cloud.voicebox import VoiceboxAnswer, VoiceboxAppSettings
+from stardog.cloud.voicebox import ThinkMode, VoiceboxAnswer, VoiceboxAppSettings
 
 from stardog_cloud_mcp.exceptions import StardogMCPToolException
 
@@ -67,10 +67,10 @@ class ToolHandler:
         Returns:
             A string representation of the Voicebox answer
         """
-        if not question:
-            raise ValueError("A valid question is required to execute the tool")
-
         try:
+            if not question:
+                raise ValueError("A valid question is required to execute the tool")
+
             voicebox_app = self.cloud_client.voicebox_app(
                 app_api_token=api_token, client_id=client_id
             )
@@ -109,10 +109,10 @@ class ToolHandler:
         Returns:
             A string representation of the generated SPARQL query
         """
-        if not question:
-            raise ValueError("A valid question is required to execute the tool")
-
         try:
+            if not question:
+                raise ValueError("A valid question is required to execute the tool")
+
             voicebox_app = self.cloud_client.voicebox_app(
                 app_api_token=api_token, client_id=client_id
             )
@@ -128,3 +128,53 @@ class ToolHandler:
                 tool_name="voicebox_generate_query", message=str(e)
             ) from e
         return str(response)
+
+    async def handle_voicebox_stream_ask(
+        self,
+        api_token: str,
+        client_id: Optional[str],
+        question: str,
+        conversation_id: Optional[str] = None,
+        stardog_auth_token_override: Optional[str] = None,
+        think_mode: ThinkMode = "standard",
+    ) -> str:
+        """
+        Handle the voicebox_stream_ask tool using the streaming API.
+
+        Args:
+            api_token: The Voicebox app API token
+            client_id: The client ID (optional)
+            question: The question to ask
+            conversation_id: The conversation ID (optional)
+            stardog_auth_token_override: Token override (optional)
+            think_mode: Think mode - 'standard', 'lite', or 'fast' (default: 'standard')
+        Returns:
+            A string representation of the final Voicebox answer
+        """
+        try:
+            if not question:
+                raise ValueError("A valid question is required to execute the tool")
+
+            voicebox_app = self.cloud_client.voicebox_app(
+                app_api_token=api_token, client_id=client_id
+            )
+            final_answer = None
+            async with voicebox_app.async_stream_ask(
+                question=question,
+                conversation_id=conversation_id,
+                client_id=client_id,
+                stardog_auth_token_override=stardog_auth_token_override,
+                think_mode=think_mode,
+            ) as stream:
+                async for answer in stream:
+                    if not answer.pending:
+                        final_answer = answer
+            if final_answer is None:
+                raise RuntimeError("Stream ended without a final answer")
+        except Exception as e:
+            logger.error(f"Error during streaming ask: {e}")
+            raise StardogMCPToolException(
+                tool_name="voicebox_stream_ask", message=str(e)
+            ) from e
+
+        return str(final_answer)
