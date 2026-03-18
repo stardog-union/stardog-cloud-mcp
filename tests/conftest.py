@@ -20,13 +20,6 @@ def tool_handler():
         named_graphs=["tag:stardog:api:context:local"],
         reasoning=True
     ))
-    mock_voicebox_app.async_ask = AsyncMock(return_value=MagicMock(
-        content="Test answer",
-        interpreted_question="What is the flight plan?",
-        sparql_query="SELECT * WHERE { ?s ?p ?o }",
-        conversation_id="conv-1",
-        message_id="msg-1"
-    ))
     mock_voicebox_app.async_generate_query = AsyncMock(return_value=MagicMock(
         interpreted_question="Show me all flights",
         sparql_query="SELECT * WHERE { ?flight ?hasPlan ?plan }",

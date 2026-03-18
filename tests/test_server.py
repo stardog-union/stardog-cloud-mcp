@@ -22,7 +22,6 @@ def mcp_server():
         mock_handler_instance.handle_voicebox_settings = AsyncMock(return_value="Voicebox App Settings: test-vbx-app-1")
         mock_handler_instance.handle_voicebox_ask = AsyncMock(return_value="Answer: Test answer for flight plan")
         mock_handler_instance.handle_voicebox_generate_query = AsyncMock(return_value="SPARQL: SELECT * WHERE { ?flight ?hasPlan ?plan } | Show me all flights")
-        mock_handler_instance.handle_voicebox_stream_ask = AsyncMock(return_value="Streaming Answer: Final answer for flight plan")
         # Initialize the real server (this registers the real tools)
         server = initialize_server(
             endpoint="dummy-endpoint",
@@ -325,25 +324,4 @@ def test_initialize_server_default_timeout(mock_stardog_client, mock_run):
     # Should only pass base_url, not timeout (let underlying client use its default)
     mock_stardog_client.assert_called_once_with(base_url="http://test-endpoint")
     assert server is not None
-
-
-@pytest.mark.asyncio
-async def test_voicebox_stream_ask(mcp_server):
-    async with Client(mcp_server) as client:
-        result = await client.call_tool("voicebox_stream_ask", {"question": "What is the flight plan?"})
-        print("Stream ask result:", result.data)
-        assert "Streaming Answer" in result.data
-        assert "flight plan" in result.data
-
-
-@pytest.mark.asyncio
-async def test_voicebox_stream_ask_with_think_mode(mcp_server):
-    async with Client(mcp_server) as client:
-        result = await client.call_tool(
-            "voicebox_stream_ask",
-            {"question": "What is the flight plan?", "think_mode": "fast"},
-        )
-        print("Stream ask (fast) result:", result.data)
-        assert "Streaming Answer" in result.data
-
 

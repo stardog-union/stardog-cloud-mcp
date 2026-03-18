@@ -25,12 +25,9 @@ async def test_handle_voicebox_ask(tool_handler):
         api_token="dummy-token",
         client_id="test-client",
         question="What is the flight plan?",
-        conversation_id=None,
-        stardog_auth_token_override=None
     )
     assert result is not None
-    mock_voicebox_app = tool_handler.cloud_client.voicebox_app("dummy-token", "test-client")
-    mock_voicebox_app.async_ask.assert_awaited()
+    assert "Final answer" in result
 
 
 @pytest.mark.asyncio
@@ -81,16 +78,22 @@ async def test_handle_voicebox_settings_exception():
 async def test_handle_voicebox_ask_exception():
     mock_client = MagicMock()
     mock_voicebox_app = MagicMock()
-    mock_voicebox_app.async_ask = AsyncMock(side_effect=RuntimeError("API error"))
+
+    @asynccontextmanager
+    async def failing_stream(**kwargs):
+        raise RuntimeError("API error")
+        yield  # pragma: no cover
+
+    mock_voicebox_app.async_stream_ask = failing_stream
     mock_client.voicebox_app.return_value = mock_voicebox_app
-    
+
     handler = ToolHandler(mock_client)
-    
+
     with pytest.raises(StardogMCPToolException) as exc_info:
         await handler.handle_voicebox_ask(
             "dummy-token", "test-client", "What is the flight plan?", None, None
         )
-    
+
     assert exc_info.value.name == "voicebox_ask"
     assert "API error" in str(exc_info.value)
 
@@ -116,52 +119,7 @@ async def test_handle_voicebox_generate_query_exception():
 
 
 @pytest.mark.asyncio
-async def test_handle_voicebox_stream_ask(tool_handler):
-    result = await tool_handler.handle_voicebox_stream_ask(
-        api_token="dummy-token",
-        client_id="test-client",
-        question="What is the flight plan?",
-        think_mode="standard",
-    )
-    assert result is not None
-    assert "Final answer" in result
-
-
-@pytest.mark.asyncio
-async def test_handle_voicebox_stream_ask_missing_question(tool_handler):
-    with pytest.raises(StardogMCPToolException, match="A valid question is required to execute the tool") as exc_info:
-        await tool_handler.handle_voicebox_stream_ask(
-            "dummy-token", "test-client", None
-        )
-    assert exc_info.value.name == "voicebox_stream_ask"
-
-
-@pytest.mark.asyncio
-async def test_handle_voicebox_stream_ask_exception():
-    mock_client = MagicMock()
-    mock_voicebox_app = MagicMock()
-
-    @asynccontextmanager
-    async def failing_stream_ask(**kwargs):
-        raise RuntimeError("API error")
-        yield  # pragma: no cover
-
-    mock_voicebox_app.async_stream_ask = failing_stream_ask
-    mock_client.voicebox_app.return_value = mock_voicebox_app
-
-    handler = ToolHandler(mock_client)
-
-    with pytest.raises(StardogMCPToolException) as exc_info:
-        await handler.handle_voicebox_stream_ask(
-            "dummy-token", "test-client", "What is the flight plan?", None, None, "standard"
-        )
-
-    assert exc_info.value.name == "voicebox_stream_ask"
-    assert "API error" in str(exc_info.value)
-
-
-@pytest.mark.asyncio
-async def test_handle_voicebox_stream_ask_no_final_answer():
+async def test_handle_voicebox_ask_no_final_answer():
     mock_client = MagicMock()
     mock_voicebox_app = MagicMock()
 
@@ -179,9 +137,9 @@ async def test_handle_voicebox_stream_ask_no_final_answer():
     handler = ToolHandler(mock_client)
 
     with pytest.raises(StardogMCPToolException) as exc_info:
-        await handler.handle_voicebox_stream_ask(
-            "dummy-token", "test-client", "What is the flight plan?", None, None, "standard"
+        await handler.handle_voicebox_ask(
+            "dummy-token", "test-client", "What is the flight plan?", None, None
         )
 
-    assert exc_info.value.name == "voicebox_stream_ask"
+    assert exc_info.value.name == "voicebox_ask"
     assert "Stream ended without a final answer" in str(exc_info.value)

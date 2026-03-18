@@ -9,7 +9,6 @@ from typing import Annotated, Any, AsyncIterator, Optional, cast
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_context, get_http_headers
 from stardog.cloud.client import AsyncClient as StardogAsyncClient
-from stardog.cloud.voicebox import ThinkMode
 
 from stardog_cloud_mcp import __version__
 from stardog_cloud_mcp.constants import Headers
@@ -168,7 +167,7 @@ def initialize_server(
         ] = "",
     ) -> str:
         """
-        Ask a question to Voicebox and get a natural language response
+        Ask a question to Voicebox and get a natural language response.
         """
         conversation_id = (conversation_id or "").strip() or None
         resolved_token = cast(
@@ -192,53 +191,6 @@ def initialize_server(
             question=question,
             conversation_id=conversation_id,
             stardog_auth_token_override=resolved_auth_token_override,
-        )
-
-    @server.tool(
-        name="voicebox_stream_ask",
-        annotations={"title": "Voicebox: Ask (Streaming)", "readOnlyHint": True},
-    )
-    @tool_logging("voicebox_stream_ask")
-    async def voicebox_stream_ask(
-        question: Annotated[str, "Natural language question to ask Voicebox"],
-        conversation_id: Annotated[
-            Optional[str],
-            "conversation_id is to be left blank for new conversation (system creates one automatically), "
-            "but needs to be supplied for multi-turn conversations to maintain the same conversation history/thread",
-        ] = "",
-        think_mode: Annotated[
-            ThinkMode,
-            "Think mode: 'standard' (default, most thorough), 'lite', or 'fast'",
-        ] = "standard",
-    ) -> str:
-        """
-        Ask a question to Voicebox using the streaming API for longer, more detailed responses.
-        Uses Voicebox's think modes: 'standard' (default, most thorough), 'lite', or 'fast', mentioned
-        in order of thoroughness.
-        """
-        conversation_id = (conversation_id or "").strip() or None
-        resolved_token = cast(
-            str,
-            await resolve_params(
-                Headers.STARDOG_CLOUD_API_KEY,
-                api_token,
-                required=True,
-                error_message="API token is required",
-            ),
-        )
-        resolved_client_id = await resolve_params(
-            Headers.STARDOG_CLOUD_CLIENT_ID, client_id
-        )
-        resolved_auth_token_override = await resolve_params(
-            Headers.STARDOG_AUTH_TOKEN_OVERRIDE, auth_token_override
-        )
-        return await tool_handler.handle_voicebox_stream_ask(
-            api_token=resolved_token,
-            client_id=resolved_client_id,
-            question=question,
-            conversation_id=conversation_id,
-            stardog_auth_token_override=resolved_auth_token_override,
-            think_mode=think_mode,
         )
 
     @server.tool(
