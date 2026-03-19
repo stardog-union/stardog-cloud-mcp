@@ -58,6 +58,9 @@ class ToolHandler:
         """
         Handle the voicebox_ask tool.
 
+        Uses the streaming API internally, collecting the stream server-side
+        and returning the final answer as a string.
+
         Args:
             api_token: The Voicebox app API token
             client_id: The client ID (optional)
@@ -67,27 +70,33 @@ class ToolHandler:
         Returns:
             A string representation of the Voicebox answer
         """
-        if not question:
-            raise ValueError("A valid question is required to execute the tool")
-
         try:
+            if not question:
+                raise ValueError("A valid question is required to execute the tool")
+
             voicebox_app = self.cloud_client.voicebox_app(
                 app_api_token=api_token, client_id=client_id
             )
 
-            answer: VoiceboxAnswer = await voicebox_app.async_ask(
+            final_answer = None
+            async with voicebox_app.async_stream_ask(
                 question=question,
                 conversation_id=conversation_id,
                 client_id=client_id,
                 stardog_auth_token_override=stardog_auth_token_override,
-            )
+            ) as stream:
+                async for answer in stream:
+                    if not answer.pending:
+                        final_answer = answer
+            if final_answer is None:
+                raise RuntimeError("Stream ended without a final answer")
         except Exception as e:
             logger.error(f"Error occurred while asking question: {e}")
             raise StardogMCPToolException(
                 tool_name="voicebox_ask", message=str(e)
             ) from e
 
-        return str(answer)
+        return str(final_answer)
 
     async def handle_voicebox_generate_query(
         self,
@@ -109,10 +118,10 @@ class ToolHandler:
         Returns:
             A string representation of the generated SPARQL query
         """
-        if not question:
-            raise ValueError("A valid question is required to execute the tool")
-
         try:
+            if not question:
+                raise ValueError("A valid question is required to execute the tool")
+
             voicebox_app = self.cloud_client.voicebox_app(
                 app_api_token=api_token, client_id=client_id
             )

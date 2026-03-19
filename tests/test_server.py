@@ -16,6 +16,7 @@ def mcp_server():
          patch('stardog_cloud_mcp.server.ToolHandler') as mock_tool_handler, \
          patch('fastmcp.FastMCP.run') as mock_run:
         mock_run.return_value = None  # Prevent running the server loop
+        mock_stardog_client.return_value.aclose = AsyncMock() # Ensures aclose() is awaitable for lifespan cleanup
         # Setup mocks for ToolHandler methods
         mock_handler_instance = mock_tool_handler.return_value
         mock_handler_instance.handle_voicebox_settings = AsyncMock(return_value="Voicebox App Settings: test-vbx-app-1")
@@ -323,5 +324,4 @@ def test_initialize_server_default_timeout(mock_stardog_client, mock_run):
     # Should only pass base_url, not timeout (let underlying client use its default)
     mock_stardog_client.assert_called_once_with(base_url="http://test-endpoint")
     assert server is not None
-
 
