@@ -13,19 +13,23 @@ async def _async_iter(items):
 @pytest.fixture
 def tool_handler():
     mock_voicebox_app = MagicMock()
-    mock_voicebox_app.async_settings = AsyncMock(return_value=MagicMock(
+    mock_settings = MagicMock(
         name="test-vbx-app-1",
         database="flight-db-2",
         model="flight_plan",
         named_graphs=["tag:stardog:api:context:local"],
         reasoning=True
-    ))
-    mock_voicebox_app.async_generate_query = AsyncMock(return_value=MagicMock(
+    )
+    mock_settings.model_dump_json = lambda: '{"name": "test-vbx-app-1", "database": "flight-db-2", "model": "flight_plan", "named_graphs": ["tag:stardog:api:context:local"], "reasoning": true}'
+    mock_voicebox_app.async_settings = AsyncMock(return_value=mock_settings)
+    mock_query_response = MagicMock(
         interpreted_question="Show me all flights",
         sparql_query="SELECT * WHERE { ?flight ?hasPlan ?plan }",
         conversation_id="conv-2",
         message_id="msg-2"
-    ))
+    )
+    mock_query_response.model_dump_json = lambda: '{"content": "", "conversation_id": "conv-2", "message_id": "msg-2", "actions": [], "pending": null, "interpreted_question": "Show me all flights", "sparql_query": "SELECT * WHERE { ?flight ?hasPlan ?plan }"}'
+    mock_voicebox_app.async_generate_query = AsyncMock(return_value=mock_query_response)
 
     mock_intermediate = MagicMock(
         content="", pending=True, conversation_id="conv-1", message_id="msg-int"
@@ -37,6 +41,7 @@ def tool_handler():
         sparql_query="SELECT * WHERE { ?s ?p ?o }",
     )
     mock_final.__str__ = lambda self: "Final answer"
+    mock_final.model_dump_json = lambda: '{"content": "Final answer", "conversation_id": "conv-1", "message_id": "msg-final", "actions": [], "pending": false}'
 
     @asynccontextmanager
     async def mock_async_stream_ask(**kwargs):

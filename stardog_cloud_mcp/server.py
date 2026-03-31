@@ -128,14 +128,13 @@ def initialize_server(
 
     server = FastMCP("stardog-cloud-mcp", lifespan=server_lifespan)
 
-    @server.tool(
-        name="voicebox_settings",
-        annotations={"title": "Voicebox: Settings", "readOnlyHint": True},
-    )
-    @tool_logging("voicebox_settings")
-    async def voicebox_settings() -> str:
-        """
-        Get the settings for a Voicebox application in Stardog Cloud
+    async def resolve_tool_params(
+        conversation_id: Optional[str] = None,
+    ) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
+        """Resolve common tool parameters from headers/args.
+
+        Returns:
+            (resolved_token, resolved_client_id, resolved_auth_token_override, normalized_conversation_id)
         """
         resolved_token = cast(
             str,
@@ -149,6 +148,27 @@ def initialize_server(
         resolved_client_id = await resolve_params(
             Headers.STARDOG_CLOUD_CLIENT_ID, client_id
         )
+        resolved_auth_token_override = await resolve_params(
+            Headers.STARDOG_AUTH_TOKEN_OVERRIDE, auth_token_override
+        )
+        normalized_conversation_id = (conversation_id or "").strip() or None
+        return (
+            resolved_token,
+            resolved_client_id,
+            resolved_auth_token_override,
+            normalized_conversation_id,
+        )
+
+    @server.tool(
+        name="voicebox_settings",
+        annotations={"title": "Voicebox: Settings", "readOnlyHint": True},
+    )
+    @tool_logging("voicebox_settings")
+    async def voicebox_settings() -> str:
+        """
+        Get the settings for a Voicebox application in Stardog Cloud
+        """
+        resolved_token, resolved_client_id, _, _ = await resolve_tool_params()
         return await tool_handler.handle_voicebox_settings(
             resolved_token, resolved_client_id
         )
@@ -169,28 +189,15 @@ def initialize_server(
         """
         Ask a question to Voicebox and get a natural language response.
         """
-        conversation_id = (conversation_id or "").strip() or None
-        resolved_token = cast(
-            str,
-            await resolve_params(
-                Headers.STARDOG_CLOUD_API_KEY,
-                api_token,
-                required=True,
-                error_message="API token is required",
-            ),
-        )
-        resolved_client_id = await resolve_params(
-            Headers.STARDOG_CLOUD_CLIENT_ID, client_id
-        )
-        resolved_auth_token_override = await resolve_params(
-            Headers.STARDOG_AUTH_TOKEN_OVERRIDE, auth_token_override
+        resolved_token, resolved_client_id, resolved_auth, conv_id = (
+            await resolve_tool_params(conversation_id)
         )
         return await tool_handler.handle_voicebox_ask(
             api_token=resolved_token,
             client_id=resolved_client_id,
             question=question,
-            conversation_id=conversation_id,
-            stardog_auth_token_override=resolved_auth_token_override,
+            conversation_id=conv_id,
+            stardog_auth_token_override=resolved_auth,
         )
 
     @server.tool(
@@ -211,28 +218,15 @@ def initialize_server(
         """
         Generate a SPARQL query from a natural language question using Voicebox
         """
-        conversation_id = (conversation_id or "").strip() or None
-        resolved_token = cast(
-            str,
-            await resolve_params(
-                Headers.STARDOG_CLOUD_API_KEY,
-                api_token,
-                required=True,
-                error_message="API token is required",
-            ),
-        )
-        resolved_client_id = await resolve_params(
-            Headers.STARDOG_CLOUD_CLIENT_ID, client_id
-        )
-        resolved_auth_token_override = await resolve_params(
-            Headers.STARDOG_AUTH_TOKEN_OVERRIDE, auth_token_override
+        resolved_token, resolved_client_id, resolved_auth, conv_id = (
+            await resolve_tool_params(conversation_id)
         )
         return await tool_handler.handle_voicebox_generate_query(
             api_token=resolved_token,
             client_id=resolved_client_id,
             question=question,
-            conversation_id=conversation_id,
-            stardog_auth_token_override=resolved_auth_token_override,
+            conversation_id=conv_id,
+            stardog_auth_token_override=resolved_auth,
         )
 
     if mode == "http":

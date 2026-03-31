@@ -45,7 +45,7 @@ class ToolHandler:
                 tool_name="voicebox_settings", message=str(e)
             ) from e
 
-        return str(voicebox_settings)
+        return voicebox_settings.model_dump_json()
 
     async def handle_voicebox_ask(
         self,
@@ -96,7 +96,7 @@ class ToolHandler:
                 tool_name="voicebox_ask", message=str(e)
             ) from e
 
-        return str(final_answer)
+        return final_answer.model_dump_json()
 
     async def handle_voicebox_generate_query(
         self,
@@ -136,4 +136,4 @@ class ToolHandler:
             raise StardogMCPToolException(
                 tool_name="voicebox_generate_query", message=str(e)
             ) from e
-        return str(response)
+        return response.model_dump_json()

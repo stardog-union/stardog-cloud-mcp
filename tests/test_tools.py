@@ -27,7 +27,8 @@ async def test_handle_voicebox_ask(tool_handler):
         question="What is the flight plan?",
     )
     assert result is not None
-    assert "Final answer" in result
+    assert '"content": "Final answer"' in result
+    assert '"conversation_id": "conv-1"' in result
 
 
 @pytest.mark.asyncio

@@ -51,6 +51,17 @@ async def test_voicebox_ask(mcp_server):
         assert "flight plan" in result.data
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("conv_id", ["", "  ", None])
+async def test_voicebox_ask_conversation_id_normalization(mcp_server, conv_id):
+    async with Client(mcp_server) as client:
+        result = await client.call_tool(
+            "voicebox_ask",
+            {"question": "What is the flight plan?", "conversation_id": conv_id},
+        )
+        assert "Answer" in result.data
+
+
+@pytest.mark.asyncio
 async def test_voicebox_generate_query(mcp_server):
     async with Client(mcp_server) as client:
         result = await client.call_tool("voicebox_generate_query", {"question": "Show me all flights"})
