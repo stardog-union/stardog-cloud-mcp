@@ -24,7 +24,7 @@ This project provides a server for accessing Stardog Cloud's Voicebox APIs, enab
 ## Available Tools
 
 - **voicebox_settings**: Retrieve the current settings for your Voicebox application, including database, model, and configuration details.
-- **voicebox_ask**: Ask natural language questions and receive answers from Stardog Voicebox, leveraging your database and model.
+- **voicebox_ask**: Ask natural language questions and receive rich, full-context answers from Stardog Voicebox (with reasoning chain, SPARQL queries, provenance etc), leveraging your knowledge graph.
 - **voicebox_generate_query**: Generate SPARQL queries from natural language questions using Voicebox's AI capabilities.
 
 ---
@@ -93,7 +93,7 @@ Use the following sample json to make Claude Desktop to point to your local MCP 
 
 > [!NOTE]
 > - You can additionally specify `--endpoint` to point to a different Stardog Cloud instance \[Default: https://cloud.stardog.com/api\]
-> - You can also specify `--timeout` to configure the request timeout in seconds (default: 30.0)
+> - You can also specify `--timeout` to configure the request timeout in seconds (default: 300s)
 > - The `--client_id` is optional but recommended to help track usage
 ### **Cursor**: 
 Use Cursor's MCP integration to connect to your local server by configuring the `mcp.json` file. 
@@ -124,8 +124,16 @@ Use Cursor's MCP integration to connect to your local server by configuring the 
 
 ## Remote Setup (Beta)
 
-You can configure remote MCP access for tools like Cursor and Claude Desktop. 
-The server requires your Voicebox API token for authentication. This needs to be provisioned in the headers against the key `x-sdc-api-key`.
+You can configure remote MCP access for tools like Cursor and Claude Desktop by running the server in HTTP mode via Docker. For setting this up in your local Launchpad environment, please contact Stardog support.  
+For local testing, you can build and run the Docker container on your machine. Use the following commands as reference:
+
+**Starting the server:**
+```bash
+make docker-build    # build the Docker image
+make docker-up       # start the server on port 7001
+```
+
+The server requires your Voicebox API token for authentication. In remote/HTTP mode, pass the token via the `x-sdc-api-key` header on each request.
 
 ### Integrating with Cursor
 
@@ -148,7 +156,7 @@ Add the following to your Cursor configuration:
 See [Cursor MCP documentation](https://docs.cursor.com/en/context/mcp#using-mcp-json) for more details.
 
 > [!TIP]
-> Set the `SDC_TIMEOUT` environment variable (in seconds) when starting the Docker container to configure the HTTP request timeout. Default is 30.0 seconds. Example: `docker run -e SDC_TIMEOUT=120 ...`
+> Set the `SDC_TIMEOUT` environment variable (in seconds) when starting the Docker container to configure the request timeout. Default is 300 seconds. Example: `docker run -e SDC_TIMEOUT=120 ...`
 
 > [!NOTE]
 > The `x-sd-auth-token` header is an optional bearer token to override the default Stardog token for Voicebox. This is useful when connecting via SSO (e.g., Microsoft Entra) to supply a custom SSO token for Stardog authentication.
