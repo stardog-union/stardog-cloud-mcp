@@ -120,8 +120,13 @@ workflows:
   # This workflow runs for each github PR commit
   build_and_test:
     when:
-      not:
-        equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+      and:
+        - not:
+            equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+        - not:
+            equal: [ main, << pipeline.git.branch >> ]
+        - not:
+            matches: { pattern: ".+", value: << pipeline.git.tag >> }
     jobs:
       - setup
       - build:

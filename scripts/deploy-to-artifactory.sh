@@ -34,7 +34,7 @@ if [ "$PUSH_TO_ARTIFACTORY" = true ]; then
   if [ "${TAG}" = "main" ]; then
     echo "Building images for main"
     # Switch the tag to include timestamp
-    TAG=${TAG}-${CIRCLE_SHA1:0:7}-$(date +%Y%m%d%H%M)
+    TAG=${TAG}-${CIRCLE_SHA1:0:7}
   fi
 
   if [ -z "${ARTIFACTORY_PASSWORD}" ]; then

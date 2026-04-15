@@ -2,8 +2,9 @@ import argparse
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 from functools import wraps
-from typing import Optional, cast
+from typing import Annotated, Any, AsyncIterator, Optional, cast
 
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_context, get_http_headers
@@ -19,14 +20,19 @@ logger = logging.getLogger("stardog_cloud_mcp")
 def tool_logging(tool_name: str):
     def decorator(func):
         @wraps(func)
-        async def wrapper(*argts, **kwargs):
+        async def wrapper(*args, **kwargs):
             ctx = get_context()
             if ctx is not None:
                 await ctx.info(f"Entering tool: {tool_name}")
-            result = await func(*argts, **kwargs)
-            if ctx is not None:
-                await ctx.info(f"Exiting tool: {tool_name}")
-            return result
+            try:
+                result = await func(*args, **kwargs)
+                if ctx is not None:
+                    await ctx.info(f"Exiting tool: {tool_name}")
+                return result
+            except Exception:
+                if ctx is not None:
+                    await ctx.info(f"Exiting tool: {tool_name} (error)")
+                raise
 
         return wrapper
 
@@ -107,12 +113,51 @@ def initialize_server(
     Start the Stardog Cloud MCP server using FastMCP.
     """
     logger.info("Starting Stardog Cloud MCP server ⭐🐕☁️")
-    server = FastMCP("stardog-cloud-mcp")
     if timeout is not None:
         cloud_client = StardogAsyncClient(base_url=endpoint, timeout=timeout)
     else:
         cloud_client = StardogAsyncClient(base_url=endpoint)
     tool_handler = ToolHandler(cloud_client)
+
+    @asynccontextmanager
+    async def server_lifespan(app: FastMCP) -> AsyncIterator[Any]:
+        try:
+            yield {}
+        finally:
+            await cloud_client.aclose()
+
+    server = FastMCP("stardog-cloud-mcp", lifespan=server_lifespan)
+
+    async def resolve_tool_params(
+        conversation_id: Optional[str] = None,
+    ) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
+        """Resolve common tool parameters from headers/args.
+
+        Returns:
+            (resolved_token, resolved_client_id, resolved_auth_token_override, normalized_conversation_id)
+        """
+        resolved_token = cast(
+            str,
+            await resolve_params(
+                Headers.STARDOG_CLOUD_API_KEY,
+                api_token,
+                required=True,
+                error_message="API token is required",
+            ),
+        )
+        resolved_client_id = await resolve_params(
+            Headers.STARDOG_CLOUD_CLIENT_ID, client_id
+        )
+        resolved_auth_token_override = await resolve_params(
+            Headers.STARDOG_AUTH_TOKEN_OVERRIDE, auth_token_override
+        )
+        normalized_conversation_id = (conversation_id or "").strip() or None
+        return (
+            resolved_token,
+            resolved_client_id,
+            resolved_auth_token_override,
+            normalized_conversation_id,
+        )
 
     @server.tool(
         name="voicebox_settings",
@@ -123,18 +168,7 @@ def initialize_server(
         """
         Get the settings for a Voicebox application in Stardog Cloud
         """
-        resolved_token = cast(
-            str,
-            await resolve_params(
-                Headers.STARDOG_CLOUD_API_KEY,
-                api_token,
-                required=True,
-                error_message="API token is required",
-            ),
-        )
-        resolved_client_id = await resolve_params(
-            Headers.STARDOG_CLOUD_CLIENT_ID, client_id
-        )
+        resolved_token, resolved_client_id, _, _ = await resolve_tool_params()
         return await tool_handler.handle_voicebox_settings(
             resolved_token, resolved_client_id
         )
@@ -145,33 +179,25 @@ def initialize_server(
     )
     @tool_logging("voicebox_ask")
     async def voicebox_ask(
-        question: str,
-        conversation_id: Optional[str] = None,
+        question: Annotated[str, "Natural language question to ask Voicebox"],
+        conversation_id: Annotated[
+            Optional[str],
+            "conversation_id is to be left blank for new conversation (system creates one automatically), "
+            "but needs to be supplied for multi-turn conversations to maintain the same conversation history/thread",
+        ] = "",
     ) -> str:
         """
-        Ask a question to Voicebox and get a natural language response
+        Ask a question to Voicebox and get a natural language response.
         """
-        resolved_token = cast(
-            str,
-            await resolve_params(
-                Headers.STARDOG_CLOUD_API_KEY,
-                api_token,
-                required=True,
-                error_message="API token is required",
-            ),
-        )
-        resolved_client_id = await resolve_params(
-            Headers.STARDOG_CLOUD_CLIENT_ID, client_id
-        )
-        resolved_auth_token_override = await resolve_params(
-            Headers.STARDOG_AUTH_TOKEN_OVERRIDE, auth_token_override
+        resolved_token, resolved_client_id, resolved_auth, conv_id = (
+            await resolve_tool_params(conversation_id)
         )
         return await tool_handler.handle_voicebox_ask(
             api_token=resolved_token,
             client_id=resolved_client_id,
             question=question,
-            conversation_id=conversation_id,
-            stardog_auth_token_override=resolved_auth_token_override,
+            conversation_id=conv_id,
+            stardog_auth_token_override=resolved_auth,
         )
 
     @server.tool(
@@ -180,33 +206,27 @@ def initialize_server(
     )
     @tool_logging("voicebox_generate_query")
     async def voicebox_generate_query(
-        question: str,
-        conversation_id: Optional[str] = None,
+        question: Annotated[
+            str, "Natural language question to generate SPARQL query from"
+        ],
+        conversation_id: Annotated[
+            Optional[str],
+            "conversation_id is to be left blank for new conversation (system creates one automatically), "
+            "but needs to be supplied for multi-turn conversations to maintain the same conversation history/thread",
+        ] = "",
     ) -> str:
         """
         Generate a SPARQL query from a natural language question using Voicebox
         """
-        resolved_token = cast(
-            str,
-            await resolve_params(
-                Headers.STARDOG_CLOUD_API_KEY,
-                api_token,
-                required=True,
-                error_message="API token is required",
-            ),
-        )
-        resolved_client_id = await resolve_params(
-            Headers.STARDOG_CLOUD_CLIENT_ID, client_id
-        )
-        resolved_auth_token_override = await resolve_params(
-            Headers.STARDOG_AUTH_TOKEN_OVERRIDE, auth_token_override
+        resolved_token, resolved_client_id, resolved_auth, conv_id = (
+            await resolve_tool_params(conversation_id)
         )
         return await tool_handler.handle_voicebox_generate_query(
             api_token=resolved_token,
             client_id=resolved_client_id,
             question=question,
-            conversation_id=conversation_id,
-            stardog_auth_token_override=resolved_auth_token_override,
+            conversation_id=conv_id,
+            stardog_auth_token_override=resolved_auth,
         )
 
     if mode == "http":

@@ -153,15 +153,6 @@ wheels = [
 ]
 
 [[package]]
-name = "contextlib2"
-version = "21.6.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c7/13/37ea7805ae3057992e96ecb1cffa2fa35c2ef4498543b846f90dd2348d8f/contextlib2-21.6.0.tar.gz", hash = "sha256:ab1e2bfe1d01d968e1b7e8d9023bc51ef3509bba217bb730cee3827e1ee82869", size = 43795, upload-time = "2021-06-27T06:54:40.841Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/56/6d6872f79d14c0cb02f1646cbb4592eef935857c0951a105874b7b62a0c3/contextlib2-21.6.0-py2.py3-none-any.whl", hash = "sha256:3fbdb64466afd23abaf6c977627b75b6139a5a3e8ce38405c5b413aed7a0471f", size = 13277, upload-time = "2021-06-27T06:54:20.972Z" },
-]
-
-[[package]]
 name = "coverage"
 version = "7.10.5"
 source = { registry = "https://pypi.org/simple" }
@@ -892,16 +883,16 @@ wheels = [
 
 [[package]]
 name = "pystardog"
-version = "0.19.0"
+version = "0.20.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "contextlib2" },
     { name = "rdflib" },
     { name = "requests" },
     { name = "requests-toolbelt" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/c2/3f/c8e56d13585488086d11981c5b62a1cdf397ba681b667531426f4f9b9ec8/pystardog-0.20.0.tar.gz", hash = "sha256:371181cc5b9082c5e32ea54895e6be0227f4a7cf51c9f50a33cbf6f2ee54be14", size = 58193, upload-time = "2026-03-18T06:08:03.674Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/50/c638819cc5cbc4bc9178fe271123fe36f6d1dde89aa434cadc90d0471775/pystardog-0.19.0-py3-none-any.whl", hash = "sha256:b22ddc82b9d22b698f4d7a277476707aa991d72faf12010031609ff173cc0056", size = 37865, upload-time = "2025-08-08T18:47:47.508Z" },
+    { url = "https://files.pythonhosted.org/packages/69/36/2b3744073889547556d541e5ca64611c960fc29b5e91259689561301e115/pystardog-0.20.0-py3-none-any.whl", hash = "sha256:aa21f9e266e83a952ff517831a4f7a08edccc69e47867aa0bcf50493a325034a", size = 38981, upload-time = "2026-03-18T06:08:02.116Z" },
 ]
 
 [[package]]
@@ -1217,7 +1208,7 @@ requires-dist = [
     { name = "isort", marker = "extra == 'dev'", specifier = "==6.0.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.17.1" },
     { name = "pydantic", specifier = ">=2.11.0" },
-    { name = "pystardog", specifier = ">=0.19.0" },
+    { name = "pystardog", specifier = ">=0.20.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==8.4.1" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = "==1.1.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = "==6.2.1" },

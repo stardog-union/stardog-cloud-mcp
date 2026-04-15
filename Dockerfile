@@ -22,4 +22,4 @@ RUN uv pip install --system .
 EXPOSE 7000
 
 # Run the FastMCP server using the console script in HTTP mode
-ENTRYPOINT ["uv", "run", "stardog-cloud-mcp", "--mode", "http"]
+ENTRYPOINT ["stardog-cloud-mcp", "--mode", "http"]
