@@ -12,6 +12,9 @@ from stardog_cloud_mcp.server import initialize_server, resolve_params
 
 @pytest.fixture
 def mcp_server():
+    # `yield` server so the patches stay active while the test
+    # connects a Client. The StardogAsyncClient + ToolHandler are now
+    # constructed inside the lifespan, which fires on Client connect.
     with patch('stardog_cloud_mcp.server.StardogAsyncClient') as mock_stardog_client, \
          patch('stardog_cloud_mcp.server.ToolHandler') as mock_tool_handler, \
          patch('fastmcp.FastMCP.run') as mock_run:
@@ -31,8 +34,7 @@ def mcp_server():
             mode="stdio",
             port=7000,
         )
-        # Return the server instance for FastMCP Client
-        return server
+        yield server
 
 @pytest.mark.asyncio
 async def test_voicebox_settings(mcp_server):
@@ -89,11 +91,13 @@ async def test_voicebox_settings_missing_token(mock_run, monkeypatch):
             await client.call_tool("voicebox_settings", {})
 
 @patch('fastmcp.FastMCP.run')
+@patch('stardog_cloud_mcp.server.StardogAsyncClient')
 @patch('stardog_cloud_mcp.server.ToolHandler')
 @pytest.mark.asyncio
-async def test_voicebox_settings_with_header(mock_tool_handler, mock_run, monkeypatch):
+async def test_voicebox_settings_with_header(mock_tool_handler, mock_stardog_client, mock_run, monkeypatch):
     monkeypatch.setattr("stardog_cloud_mcp.server.get_http_headers", lambda: {Headers.STARDOG_CLOUD_API_KEY: "header-token"})
     mock_run.return_value = None
+    mock_stardog_client.return_value.aclose = AsyncMock()
     mock_handler_instance = mock_tool_handler.return_value
     mock_handler_instance.handle_voicebox_settings = AsyncMock(return_value="Voicebox App Settings: test-vbx-app-1")
     server_instance = initialize_server(
@@ -300,8 +304,10 @@ def test_initialize_server_http_mode(mock_run):
 
 @patch('fastmcp.FastMCP.run')
 @patch('stardog_cloud_mcp.server.StardogAsyncClient')
-def test_initialize_server_custom_timeout(mock_stardog_client, mock_run):
+@pytest.mark.asyncio
+async def test_initialize_server_custom_timeout(mock_stardog_client, mock_run):
     mock_run.return_value = None
+    mock_stardog_client.return_value.aclose = AsyncMock()
 
     server = initialize_server(
         endpoint="http://test-endpoint",
@@ -313,15 +319,30 @@ def test_initialize_server_custom_timeout(mock_stardog_client, mock_run):
         timeout=120.0,
     )
 
+    # Trigger the lifespan so StardogAsyncClient gets constructed.
+    async with Client(server):
+        pass
+
     mock_stardog_client.assert_called_once_with(base_url="http://test-endpoint", timeout=120.0)
     assert server is not None
 
 
 @patch('fastmcp.FastMCP.run')
 @patch('stardog_cloud_mcp.server.StardogAsyncClient')
-def test_initialize_server_default_timeout(mock_stardog_client, mock_run):
-    """Test that when no timeout is specified, it uses underlying client default."""
+@patch('stardog_cloud_mcp.server.ToolHandler')
+@pytest.mark.asyncio
+async def test_sequential_sessions_each_get_a_fresh_cloud_client(
+    mock_tool_handler, mock_stardog_client, mock_run
+):
+    """Regression: opening a second MCP session must not surface the first
+    session's already-closed Stardog Cloud client"
+    """
     mock_run.return_value = None
+    mock_stardog_client.return_value.aclose = AsyncMock()
+    mock_handler_instance = mock_tool_handler.return_value
+    mock_handler_instance.handle_voicebox_settings = AsyncMock(
+        return_value="Voicebox App Settings: ok"
+    )
 
     server = initialize_server(
         endpoint="http://test-endpoint",
@@ -331,6 +352,42 @@ def test_initialize_server_default_timeout(mock_stardog_client, mock_run):
         mode="stdio",
         port=7000,
     )
+
+    # First session.
+    async with Client(server) as client:
+        result = await client.call_tool("voicebox_settings", {})
+        assert "Voicebox App Settings" in result.data
+
+    # Second session, on the same server instance. Must not raise.
+    async with Client(server) as client:
+        result = await client.call_tool("voicebox_settings", {})
+        assert "Voicebox App Settings" in result.data
+
+    # Each lifespan cycle must construct its own StardogAsyncClient and
+    # aclose() it independently — never reuse a closed instance.
+    assert mock_stardog_client.call_count == 2
+    assert mock_stardog_client.return_value.aclose.await_count == 2
+
+
+@patch('fastmcp.FastMCP.run')
+@patch('stardog_cloud_mcp.server.StardogAsyncClient')
+@pytest.mark.asyncio
+async def test_initialize_server_default_timeout(mock_stardog_client, mock_run):
+    """Test that when no timeout is specified, it uses underlying client default."""
+    mock_run.return_value = None
+    mock_stardog_client.return_value.aclose = AsyncMock()
+
+    server = initialize_server(
+        endpoint="http://test-endpoint",
+        api_token="test-token",
+        client_id="test-client",
+        auth_token_override=None,
+        mode="stdio",
+        port=7000,
+    )
+
+    async with Client(server):
+        pass
 
     # Should only pass base_url, not timeout (let underlying client use its default)
     mock_stardog_client.assert_called_once_with(base_url="http://test-endpoint")
