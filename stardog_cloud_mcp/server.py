@@ -113,20 +113,40 @@ def initialize_server(
     Start the Stardog Cloud MCP server using FastMCP.
     """
     logger.info("Starting Stardog Cloud MCP server ⭐🐕☁️")
-    if timeout is not None:
-        cloud_client = StardogAsyncClient(base_url=endpoint, timeout=timeout)
-    else:
-        cloud_client = StardogAsyncClient(base_url=endpoint)
-    tool_handler = ToolHandler(cloud_client)
 
+    # The Stardog Cloud client is created once per lifespan cycle (session),
+    # not once for the whole process, and is exposed via `lifespan_context`.
+    # The MCP SDK enters the lifespan once per session.
+    # Reusing one httpx.AsyncClient across cycles and calling `aclose()` at
+    # session end can break later sessions.
+    # Yielding the handler through `lifespan_context` (instead of a closure
+    # variable) is also safe for concurrent sessions in the same process:
+    # each request reads its own session handler from its own context.
     @asynccontextmanager
-    async def server_lifespan(app: FastMCP) -> AsyncIterator[Any]:
+    async def server_lifespan(app: FastMCP) -> AsyncIterator[dict[str, Any]]:
+        if timeout is not None:
+            cloud_client = StardogAsyncClient(base_url=endpoint, timeout=timeout)
+        else:
+            cloud_client = StardogAsyncClient(base_url=endpoint)
         try:
-            yield {}
+            yield {"handler": ToolHandler(cloud_client)}
         finally:
             await cloud_client.aclose()
 
     server = FastMCP("stardog-cloud-mcp", lifespan=server_lifespan)
+
+    def _handler() -> ToolHandler:
+        ctx = get_context()
+        if ctx is None:
+            raise RuntimeError(
+                "No FastMCP request context; tool dispatch must run inside a request."
+            )
+        handler = ctx.request_context.lifespan_context.get("handler")
+        if handler is None:
+            raise RuntimeError(
+                "ToolHandler missing from lifespan_context; server lifespan likely failed to enter."
+            )
+        return handler
 
     async def resolve_tool_params(
         conversation_id: Optional[str] = None,
@@ -169,7 +189,7 @@ def initialize_server(
         Get the settings for a Voicebox application in Stardog Cloud
         """
         resolved_token, resolved_client_id, _, _ = await resolve_tool_params()
-        return await tool_handler.handle_voicebox_settings(
+        return await _handler().handle_voicebox_settings(
             resolved_token, resolved_client_id
         )
 
@@ -192,7 +212,7 @@ def initialize_server(
         resolved_token, resolved_client_id, resolved_auth, conv_id = (
             await resolve_tool_params(conversation_id)
         )
-        return await tool_handler.handle_voicebox_ask(
+        return await _handler().handle_voicebox_ask(
             api_token=resolved_token,
             client_id=resolved_client_id,
             question=question,
@@ -221,7 +241,7 @@ def initialize_server(
         resolved_token, resolved_client_id, resolved_auth, conv_id = (
             await resolve_tool_params(conversation_id)
         )
-        return await tool_handler.handle_voicebox_generate_query(
+        return await _handler().handle_voicebox_generate_query(
             api_token=resolved_token,
             client_id=resolved_client_id,
             question=question,
