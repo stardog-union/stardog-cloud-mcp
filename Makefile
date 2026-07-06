@@ -6,6 +6,13 @@ VENV := $(PWD)/venv
 PIP := $(VENV)/bin/pip
 PYTHON_SRC := stardog_cloud_mcp
 
+# Docker / vulnerability-scan settings
+IMAGE := stardog-cloud-mcp
+REPORTS_DIR := reports
+TRIVY_IMAGE := aquasec/trivy:latest
+# Severities that FAIL the scan gate
+TRIVY_SEVERITY := HIGH,CRITICAL
+
 YELLOW := \033[1;33m
 GREEN := \033[1;32m
 NC := \033[0m  # No Color
@@ -29,6 +36,8 @@ help:
 	@echo "  make docker-compose     Run with docker-compose (requires STARDOG_CLOUD_TOKEN)"
 	@echo "  make docker-stop        Stop docker-compose services"
 	@echo "  make docker-clean       Remove Docker containers and images"
+	@echo "  make docker-scan        Scan the built image; fail on fixable HIGH/CRITICAL CVEs"
+	@echo "  make docker-scan-report Write Trivy vulnerability reports to $(REPORTS_DIR)/"
 	@echo ""
 
 # Setup and installation
@@ -96,7 +105,7 @@ clean:
 .PHONY: docker-build
 docker-build:
 	@echo "$(GREEN)Building Docker image...$(NC)"
-	docker build --no-cache -t stardog-cloud-mcp .
+	docker build --no-cache -t $(IMAGE) .
 	@echo "$(GREEN)Docker image built!$(NC)"
 
 .PHONY: docker-up
@@ -113,6 +122,27 @@ docker-stop:
 .PHONY: docker-clean
 docker-clean: docker-stop
 	@echo "$(GREEN)Removing Docker containers and images...$(NC)"
-	docker rmi stardog-cloud-mcp || true
+	docker rmi $(IMAGE) || true
 	@echo "$(GREEN)Docker cleanup complete!$(NC)"
+
+# Vulnerability scanning (Trivy). Runs Trivy from its official container so no
+# local install is needed
+.PHONY: docker-scan
+docker-scan:
+	@echo "$(GREEN)Scanning $(IMAGE) for fixable $(TRIVY_SEVERITY) vulnerabilities...$(NC)"
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock $(TRIVY_IMAGE) \
+		image --ignore-unfixed --exit-code 1 --severity $(TRIVY_SEVERITY) $(IMAGE)
+	@echo "$(GREEN)No fixable $(TRIVY_SEVERITY) vulnerabilities found in $(IMAGE)!$(NC)"
+
+.PHONY: docker-scan-report
+docker-scan-report:
+	@echo "$(GREEN)Writing Trivy reports to $(REPORTS_DIR)/...$(NC)"
+	@mkdir -p $(REPORTS_DIR)
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+		-v $(PWD)/$(REPORTS_DIR):/$(REPORTS_DIR) $(TRIVY_IMAGE) \
+		image --severity $(TRIVY_SEVERITY) --format table -o /$(REPORTS_DIR)/trivy-$(IMAGE).txt $(IMAGE)
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+		-v $(PWD)/$(REPORTS_DIR):/$(REPORTS_DIR) $(TRIVY_IMAGE) \
+		image --severity $(TRIVY_SEVERITY) --format json -o /$(REPORTS_DIR)/trivy-$(IMAGE).json $(IMAGE)
+	@echo "$(GREEN)Reports written to $(REPORTS_DIR)/$(NC)"
 

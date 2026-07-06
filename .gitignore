@@ -113,3 +113,6 @@ stardog-license-key.bin
 # test files/data
 data/
 data
+
+# Trivy vulnerability scan output
+reports/
