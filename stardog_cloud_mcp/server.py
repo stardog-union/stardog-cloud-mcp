@@ -137,7 +137,7 @@ def initialize_server(
 
     def _handler() -> ToolHandler:
         ctx = get_context()
-        if ctx is None:
+        if ctx is None or ctx.request_context is None:
             raise RuntimeError(
                 "No FastMCP request context; tool dispatch must run inside a request."
             )

@@ -1,7 +1,7 @@
 import os
 import subprocess
 import sys
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 
 import pytest
 from fastmcp import Client
@@ -392,4 +392,27 @@ async def test_initialize_server_default_timeout(mock_stardog_client, mock_run):
     # Should only pass base_url, not timeout (let underlying client use its default)
     mock_stardog_client.assert_called_once_with(base_url="http://test-endpoint")
     assert server is not None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("missing", ["ctx", "request_context"])
+async def test_handler_requires_active_request_context(mcp_server, missing):
+    """_handler() must refuse to dispatch without an active request context.
+
+    Covers both branches of the guard: get_context() returning None, and
+    (the fastmcp 3.x case) a context whose request_context is None.
+    """
+    if missing == "ctx":
+        fake_ctx = None
+    else:
+        fake_ctx = MagicMock()
+        fake_ctx.info = AsyncMock()  # awaited by the tool_logging wrapper
+        fake_ctx.request_context = None
+
+    with patch("stardog_cloud_mcp.server.get_context", return_value=fake_ctx):
+        async with Client(mcp_server) as client:
+            with pytest.raises(Exception) as exc_info:
+                await client.call_tool("voicebox_settings", {})
+
+    assert "No FastMCP request context" in str(exc_info.value)
 
